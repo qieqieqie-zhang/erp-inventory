@@ -44,6 +44,10 @@ Thumbs.db
 # 后端测试文件（需要提交）
 !backend/tests/*.test.js
 
+# E2E测试文件（需要提交）
+!backend/e2e/*.spec.js
+!backend/playwright.config.js
+
 # 测试相关（已清理）
 *_test.js
 test_*.js

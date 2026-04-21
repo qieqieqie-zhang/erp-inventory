@@ -354,28 +354,29 @@ class ProductModel extends BaseModel {
     const country = destinationCountry.toUpperCase();
 
     // 美国 -> 亚马逊北美
-    if (country === 'US' || country === 'USA' || country === 'UNITED STATES') {
+    if (country === 'US' || country === 'USA' || country === 'UNITED STATES' || country === '美国') {
       return 'AMAZON_NA';
     }
 
     // 日本 -> 亚马逊日本
-    if (country === 'JP' || country === 'JAPAN') {
+    if (country === 'JP' || country === 'JAPAN' || country === '日本') {
       return 'AMAZON_JP';
     }
 
     // 欧洲主要国家 -> 亚马逊欧洲
     const euCountries = ['UK', 'GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'PL', 'SE', 'CZ', 'AT', 'BE', 'IE', 'PT', 'SK', 'HU'];
-    if (euCountries.includes(country)) {
+    const euCountryNames = ['英国', '德国', '法国', '意大利', '西班牙', '荷兰', '波兰', '瑞典', '捷克', '奥地利', '比利时', '爱尔兰', '葡萄牙', '斯洛伐克', '匈牙利'];
+    if (euCountries.includes(country) || euCountryNames.some(name => country.includes(name))) {
       return 'AMAZON_EU';
     }
 
     // 加拿大、墨西哥 -> 亚马逊北美（可单独处理）
-    if (country === 'CA' || country === 'MX') {
+    if (country === 'CA' || country === 'MX' || country === '加拿大' || country === '墨西哥') {
       return 'AMAZON_NA';
     }
 
     // 澳大利亚 -> 单独站点（如果有的话可以添加）
-    if (country === 'AU') {
+    if (country === 'AU' || country === '澳大利亚') {
       return 'AMAZON_NA'; // 暂时归到北美
     }
 
