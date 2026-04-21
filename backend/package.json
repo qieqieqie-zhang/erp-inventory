@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "keywords": [],
   "author": "",
@@ -19,10 +20,13 @@
     "iconv-lite": "^0.7.2",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
-    "mysql2": "^3.21.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "axios": "^1.15.0"
+    "@types/jest": "^30.0.0",
+    "axios": "^1.15.0",
+    "jest": "^30.3.0",
+    "mysql2": "^3.22.2",
+    "supertest": "^7.2.2"
   }
 }

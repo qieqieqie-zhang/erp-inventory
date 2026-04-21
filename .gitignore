@@ -41,8 +41,10 @@ Thumbs.db
 .idea/
 *.iml
 
+# 后端测试文件（需要提交）
+!backend/tests/*.test.js
+
 # 测试相关（已清理）
-*.test.js
 *_test.js
 test_*.js
 
