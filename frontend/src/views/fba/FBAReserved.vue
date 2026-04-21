@@ -43,7 +43,7 @@
           <el-card shadow="never" class="overview-card customer-orders">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><ShoppingCart /></el-icon>
+                <el-icon><Goods /></el-icon>
               </div>
               <div class="overview-content">
                 <div class="overview-value">{{ formatNumber(overviewData.customerOrders || 0) }}</div>
@@ -60,7 +60,7 @@
           <el-card shadow="never" class="overview-card transfer-in">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><Truck /></el-icon>
+                <el-icon><Van /></el-icon>
               </div>
               <div class="overview-content">
                 <div class="overview-value">{{ formatNumber(overviewData.transferIn || 0) }}</div>
@@ -77,7 +77,7 @@
           <el-card shadow="never" class="overview-card transfer-out">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><Ship /></el-icon>
+                <el-icon><Sell /></el-icon>
               </div>
               <div class="overview-content">
                 <div class="overview-value">{{ formatNumber(overviewData.transferOut || 0) }}</div>
@@ -353,9 +353,9 @@ import {
   Download,
   View,
   Box,
-  ShoppingCart,
-  Truck,
-  Ship,
+  Goods,
+  Van,
+  Sell,
   Grid,
   Menu,
   ArrowDown,
