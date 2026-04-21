@@ -375,14 +375,12 @@ class ProductModel extends BaseModel {
       }
 
       if (existing) {
-        // 覆盖更新：店铺和批次取物流数据，数量固定为0（在途≠可售），保留商品主图等已有字段
+        // 覆盖更新：店铺和批次取物流数据，数量固定为0（在途≠可售），只更新item_name和shop_id，其他字段保持不变
         await this.query(
           `UPDATE amazon_products SET
             item_name = COALESCE(?, item_name),
-            quantity = COALESCE(quantity, 0),
             shop_id = ?,
-            upload_batch = ?,
-            updated_at = CURRENT_TIMESTAMP
+            upload_batch = ?
           WHERE id = ?`,
           [item.sku_name || existing.item_name, shopId, batchPrefix, existing.id]
         );
