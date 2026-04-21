@@ -146,6 +146,7 @@ export const apiService = {
     updateStatus: (id, data) => api.patch(`/logistics/${id}/status`, data),
     updateSkuList: (formData) => api.post('/logistics/update-sku-list', formData),
     previewSkuList: (formData) => api.post('/logistics/preview-sku', formData),
+    syncProducts: (id) => api.post(`/logistics/sync-products/${id}`),
     delete: (id) => api.delete(`/logistics/${id}`),
     getStats: (params) => api.get('/logistics/stats', { params }),
     getStatusList: () => api.get('/logistics/status-list'),

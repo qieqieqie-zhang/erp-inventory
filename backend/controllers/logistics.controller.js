@@ -602,6 +602,29 @@ class LogisticsController {
       const { path: filePath } = req.file;
       const { logisticsId } = req.body;
 
+      // 获取物流记录的 shop_id 和 fba_warehouse_number
+      let shopId = null;
+      let fbaWarehouseNumber = null;
+      let logisticsRecord = null;
+      try {
+        const LogisticsModel = require('../models/LogisticsModel');
+        logisticsRecord = await LogisticsModel.findById(logisticsId);
+        if (logisticsRecord) {
+          shopId = logisticsRecord.shop_id || null;
+          fbaWarehouseNumber = logisticsRecord.fba_warehouse_number || null;
+        }
+      } catch (err) {
+        console.error('[Logistics] 获取物流记录失败:', err.message);
+      }
+
+      if (!fbaWarehouseNumber) {
+        return res.status(400).json({
+          code: 400,
+          message: '物流记录缺少FBA仓库编号，无法同步到商品',
+          data: null
+        });
+      }
+
       const xlsx = require('xlsx');
       const workbook = xlsx.readFile(filePath);
 
@@ -667,20 +690,16 @@ class LogisticsController {
       }
 
       // 同步 SKU 到商品主表（amazon_products）
-      // 只新建不覆盖，避免冲掉商品价格、图片等已有信息
+      // 覆盖更新（按 SKU + 批次匹配），未匹配到则新建
       try {
         const ProductModel = require('../models/ProductModel');
-        for (const item of validSkuData) {
-          const existing = await ProductModel.findBySku(item.sku_code);
-          if (!existing) {
-            await ProductModel.create({
-              seller_sku: item.sku_code,
-              item_name: item.sku_name || item.sku_code,
-              quantity: item.quantity || 0,
-              upload_batch: `logistics_${logisticsId}`
-            });
-          }
-        }
+        const result = await ProductModel.syncFromLogistics(
+          validSkuData,
+          parseInt(logisticsId),
+          fbaWarehouseNumber,
+          shopId
+        );
+        console.log(`[Logistics] 商品同步完成: 更新${result.updated}条，新建${result.inserted}条`);
       } catch (syncError) {
         console.error('[Logistics] amazon_products 同步失败:', syncError.message);
       }
@@ -780,6 +799,84 @@ class LogisticsController {
     } catch (error) {
       console.error('[Logistics] previewSkuList error:', error.message, error.stack);
       res.status(500).json({ code: 500, message: `解析失败: ${error.message}`, data: null });
+    }
+  }
+
+  /**
+   * 将物流SKU列表同步到商品主表
+   * 基于已有 sku_list 数据，覆盖更新商品数量和店铺信息
+   */
+  async syncProducts(req, res) {
+    try {
+      const { id } = req.params;
+
+      const LogisticsModel = require('../models/LogisticsModel');
+      const logisticsRecord = await LogisticsModel.findById(id);
+
+      if (!logisticsRecord) {
+        return res.status(404).json({ code: 404, message: '物流记录未找到', data: null });
+      }
+
+      const { fba_warehouse_number, shop_id, sku_list } = logisticsRecord;
+
+      if (!fba_warehouse_number) {
+        return res.status(400).json({
+          code: 400,
+          message: '该物流记录缺少FBA仓库编号，无法同步到商品',
+          data: null
+        });
+      }
+
+      if (!sku_list) {
+        return res.status(400).json({
+          code: 400,
+          message: '该物流记录没有SKU数据，请先上传SKU文件',
+          data: null
+        });
+      }
+
+      let skuItems = [];
+      try {
+        skuItems = typeof sku_list === 'string' ? JSON.parse(sku_list) : sku_list;
+      } catch (e) {
+        return res.status(400).json({ code: 400, message: 'SKU列表数据格式错误', data: null });
+      }
+
+      if (!Array.isArray(skuItems) || skuItems.length === 0) {
+        return res.status(400).json({ code: 400, message: 'SKU列表为空', data: null });
+      }
+
+      // 调用 ProductModel 的同步方法
+      const ProductModel = require('../models/ProductModel');
+      const result = await ProductModel.syncFromLogistics(
+        skuItems,
+        parseInt(id),
+        fba_warehouse_number,
+        shop_id
+      );
+
+      // 写日志
+      try {
+        const InventoryChangeService = require('../services/InventoryChangeService');
+        const logSvc = new InventoryChangeService('logistics', {
+          operatorId: req.user ? req.user.id : null,
+          operatorName: req.user ? (req.user.realName || req.user.username) : '',
+          referenceId: String(id),
+          remarks: `手动同步物流#${id} SKU到商品主表`
+        });
+        await logSvc.logUpload(skuItems, { referenceId: String(id) });
+      } catch (logError) {
+        console.error('[Logistics] 同步商品写日志失败:', logError.message);
+      }
+
+      res.json({
+        code: 200,
+        message: `同步完成：更新${result.updated}条，新建${result.inserted}条`,
+        data: { updated: result.updated, inserted: result.inserted }
+      });
+    } catch (error) {
+      console.error('[Logistics] syncProducts 错误:', error);
+      res.status(500).json({ code: 500, message: `服务器内部错误: ${error.message}`, data: null });
     }
   }
 }

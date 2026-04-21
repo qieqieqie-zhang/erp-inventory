@@ -318,7 +318,7 @@ class ProductModel extends BaseModel {
 
   /**
    * 删除商品
-   * @param {string} sku 
+   * @param {string} sku
    * @returns {Promise<boolean>}
    */
   async deleteProduct(sku) {
@@ -327,6 +327,79 @@ class ProductModel extends BaseModel {
       [sku]
     );
     return result.affectedRows > 0;
+  }
+
+  /**
+   * 根据SKU和批次前缀查找商品
+   * @param {string} sku
+   * @param {string} batchPrefix - 批次前缀，如 'logistics_MIT'
+   * @returns {Promise<Object|null>}
+   */
+  async findBySkuAndBatch(sku, batchPrefix) {
+    const rows = await this.query(
+      'SELECT * FROM amazon_products WHERE seller_sku = ? AND upload_batch LIKE ?',
+      [sku, `${batchPrefix}%`]
+    );
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  /**
+   * 从物流记录同步/覆盖商品数据（按 SKU + 批次匹配）
+   * 匹配到则覆盖数量、店铺等信息，未匹配到则新建
+   * @param {Array} items - SKU数据列表 [{sku_code, sku_name, quantity}]
+   * @param {number} logisticsId - 物流记录ID
+   * @param {string} fbaWarehouseNumber - FBA仓库编号（用于批次标识）
+   * @param {number} shopId - 店铺ID
+   * @returns {Promise<Object>} { updated, inserted }
+   */
+  async syncFromLogistics(items, logisticsId, fbaWarehouseNumber, shopId) {
+    const batchPrefix = `logistics_${fbaWarehouseNumber}`;
+    let updated = 0;
+    let inserted = 0;
+
+    for (const item of items) {
+      const sku = item.sku_code || item.seller_sku || '';
+      if (!sku) continue;
+
+      // 优先按 SKU + 批次匹配（找当前物流批次的产品）
+      let existing = await this.findBySkuAndBatch(sku, batchPrefix);
+
+      // 未找到，则按 SKU 模糊匹配物流批次的产品
+      if (!existing) {
+        const allBySku = await this.query(
+          'SELECT * FROM amazon_products WHERE seller_sku = ? AND upload_batch LIKE ?',
+          [sku, 'logistics_%']
+        );
+        if (allBySku.length > 0) existing = allBySku[0];
+      }
+
+      if (existing) {
+        // 覆盖更新：数量取物流数据，保留商品主图等已有字段
+        await this.query(
+          `UPDATE amazon_products SET
+            item_name = COALESCE(?, item_name),
+            quantity = ?,
+            shop_id = ?,
+            upload_batch = ?,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?`,
+          [item.sku_name || existing.item_name, item.quantity || 0, shopId, batchPrefix, existing.id]
+        );
+        updated++;
+      } else {
+        // 新建商品
+        await this.create({
+          seller_sku: sku,
+          item_name: item.sku_name || sku,
+          quantity: item.quantity || 0,
+          shop_id: shopId,
+          upload_batch: batchPrefix
+        });
+        inserted++;
+      }
+    }
+
+    return { updated, inserted };
   }
 }
 

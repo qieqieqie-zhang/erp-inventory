@@ -81,6 +81,13 @@ router.post('/update-sku-list', uploadSingle('file'), logisticsController.update
 router.post('/preview-sku', uploadSingle('file'), logisticsController.previewSkuList);
 
 /**
+ * @route POST /api/logistics/sync-products/:id
+ * @desc 将物流SKU列表同步到商品主表（覆盖更新）
+ * @access Private
+ */
+router.post('/sync-products/:id', logisticsController.syncProducts);
+
+/**
  * @route PUT /api/logistics/:id
  * @desc 更新物流跟踪记录
  * @access Private

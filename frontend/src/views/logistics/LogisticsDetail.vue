@@ -71,6 +71,7 @@
           <span>SKU明细</span>
           <div>
             <el-button type="primary" :icon="Upload" @click="showSkuUploadDialog = true">上传SKU</el-button>
+            <el-button type="success" :icon="Refresh" :loading="syncLoading" @click="handleSyncProducts">同步商品</el-button>
             <el-button :icon="Refresh" @click="fetchSkuList">刷新</el-button>
             <el-button type="danger" :disabled="selectedSkuList.length === 0" @click="handleBatchDeleteSku">批量删除{{ selectedSkuList.length > 0 ? `(${selectedSkuList.length})` : '' }}</el-button>
           </div>
@@ -161,6 +162,7 @@ const router = useRouter()
 const currentLogistics = ref(null)
 const skuList = ref([])
 const skuLoading = ref(false)
+const syncLoading = ref(false)
 const showSkuUploadDialog = ref(false)
 const selectedSkuList = ref([])
 const skuTableRef = ref(null)
@@ -232,6 +234,32 @@ const fetchSkuList = async () => {
     await fetchLogisticsDetail()
   } finally {
     skuLoading.value = false
+  }
+}
+
+const handleSyncProducts = async () => {
+  if (!currentLogistics.value?.id) {
+    ElMessage.warning('请先加载物流记录')
+    return
+  }
+  if (!currentLogistics.value?.fba_warehouse_number) {
+    ElMessage.warning('该物流记录缺少FBA仓库编号，无法同步')
+    return
+  }
+  if (!skuList.value || skuList.value.length === 0) {
+    ElMessage.warning('没有SKU数据可同步，请先上传SKU文件')
+    return
+  }
+  try {
+    syncLoading.value = true
+    await apiService.logistics.syncProducts(currentLogistics.value.id)
+    ElMessage.success('同步成功，商品列表已更新')
+  } catch (error) {
+    ElMessage.error(error.message || '同步失败')
+  } finally {
+    syncLoading.value = false
+  }
+}
   }
 }
 
