@@ -301,71 +301,49 @@
           <el-table-column
             v-if="visibleColumns.total_units"
             prop="total_units"
-            label="总库存"
+            label="库存数量"
             width="100"
             align="center"
             sortable
           >
             <template #default="{ row }">
-              <el-tag size="small" :type="getStockTagType(row.total_units, row.sellable_units)">
+              <el-tag size="small" :type="getStockTagType(row)">
                 {{ row.total_units }}
               </el-tag>
             </template>
           </el-table-column>
           <el-table-column
-            v-if="visibleColumns.sellable_units"
-            prop="sellable_units"
-            label="可售数量"
-            width="100"
-            align="center"
-            sortable
-          />
-          <el-table-column
-            v-if="visibleColumns.reserved_units"
-            prop="reserved_units"
-            label="预留数量"
-            width="100"
-            align="center"
-            sortable
-          />
-          <el-table-column
-            v-if="visibleColumns.inbound_units"
-            prop="inbound_units"
-            label="在途数量"
-            width="100"
-            align="center"
-            sortable
-          />
-          <el-table-column
-            v-if="visibleColumns.unit_value"
-            prop="unit_value"
+            v-if="visibleColumns.your_price"
+            prop="your_price"
             label="单价(¥)"
-            width="120"
-            align="right"
-            sortable
-          >
-            <template #default="{ row }">
-              {{ formatCurrency(row.unit_value) }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            v-if="visibleColumns.total_value"
-            prop="total_value"
-            label="总价值(¥)"
-            width="120"
-            align="right"
-            sortable
-          >
-            <template #default="{ row }">
-              {{ formatCurrency(row.total_value) }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            v-if="visibleColumns.warehouse_code"
-            prop="warehouse_code"
-            label="仓库"
             width="100"
+            align="right"
+            sortable
+          >
+            <template #default="{ row }">
+              {{ formatCurrency(row.your_price) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            v-if="visibleColumns.sales_last_30_days"
+            prop="sales_last_30_days"
+            label="售出件数"
+            width="100"
+            align="center"
+            sortable
           />
+          <el-table-column
+            v-if="visibleColumns.sales_amount"
+            prop="sales_amount"
+            label="售出金额(¥)"
+            width="120"
+            align="right"
+            sortable
+          >
+            <template #default="{ row }">
+              {{ formatCurrency(row.sales_amount) }}
+            </template>
+          </el-table-column>
           <el-table-column
             v-if="visibleColumns.country"
             prop="country"
@@ -466,23 +444,23 @@
                     <span class="stat-value">{{ item.total_units }}</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-label">可售:</span>
-                    <span class="stat-value">{{ item.sellable_units }}</span>
+                    <span class="stat-label">单价:</span>
+                    <span class="stat-value">{{ formatCurrency(item.your_price) }}</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-label">预留:</span>
-                    <span class="stat-value">{{ item.reserved_units }}</span>
+                    <span class="stat-label">售出件数:</span>
+                    <span class="stat-value">{{ item.sales_last_30_days }}</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-label">在途:</span>
-                    <span class="stat-value">{{ item.inbound_units }}</span>
+                    <span class="stat-label">售出金额:</span>
+                    <span class="stat-value">{{ formatCurrency(item.sales_amount) }}</span>
                   </div>
                 </div>
-                
+
                 <div class="additional-info">
                   <div class="info-item">
                     <el-icon><Location /></el-icon>
-                    <span>{{ item.warehouse_code || '未知仓库' }}</span>
+                    <span>{{ item.country || item.marketplace || '未知' }}</span>
                   </div>
                   <div class="info-item">
                     <el-icon><Clock /></el-icon>
@@ -616,13 +594,10 @@ const columnOptions = ref([
   { prop: 'product_name', label: '商品名称', visible: true },
   { prop: 'fnsku', label: 'FNSKU', visible: true },
   { prop: 'asin', label: 'ASIN', visible: true },
-  { prop: 'total_units', label: '总库存', visible: true },
-  { prop: 'sellable_units', label: '可售数量', visible: true },
-  { prop: 'reserved_units', label: '预留数量', visible: true },
-  { prop: 'inbound_units', label: '在途数量', visible: true },
-  { prop: 'unit_value', label: '单价', visible: true },
-  { prop: 'total_value', label: '总价值', visible: true },
-  { prop: 'warehouse_code', label: '仓库', visible: true },
+  { prop: 'total_units', label: '库存数量', visible: true },
+  { prop: 'your_price', label: '单价', visible: true },
+  { prop: 'sales_last_30_days', label: '售出件数', visible: true },
+  { prop: 'sales_amount', label: '售出金额', visible: true },
   { prop: 'country', label: '国家', visible: true },
   { prop: 'inventory_age_days', label: '库龄', visible: true },
   { prop: 'condition', label: '商品状况', visible: true },
@@ -684,10 +659,6 @@ const fetchInventoryList = async () => {
     inventoryList.value = (data.list || []).map(item => ({
       ...item,
       total_units: (item.available_quantity || 0) + (item.reserved_fc_transfer || 0),
-      sellable_units: item.available_quantity || 0,
-      reserved_units: item.total_reserved_quantity || 0,
-      inbound_units: item.inbound_quantity || 0,
-      warehouse_code: item.warehouse_code || item.fba_warehouse_code || '',
       product_name: item.item_name || item.product_name || ''
     }))
     pagination.value.total = data.total || 0
@@ -911,9 +882,10 @@ const getAgeStatus = (age) => {
   return '正常'
 }
 
-const getStockTagType = (total, sellable) => {
-  if (sellable === 0) return 'danger'
-  if (sellable / total < 0.2) return 'warning'
+const getStockTagType = (row) => {
+  const available = row.available_quantity || 0
+  if (available === 0) return 'danger'
+  if (available < 10) return 'warning'
   return 'success'
 }
 
@@ -927,14 +899,14 @@ const getConditionType = (condition) => {
 }
 
 const getStockStatusType = (item) => {
-  if (item.sellable_units === 0) return 'danger'
-  if (item.total_units - item.sellable_units > item.total_units * 0.5) return 'warning'
+  if ((item.available_quantity || 0) === 0) return 'danger'
+  if ((item.available_quantity || 0) < 10) return 'warning'
   return 'success'
 }
 
 const getStockStatusText = (item) => {
-  if (item.sellable_units === 0) return '缺货'
-  if (item.sellable_units < 10) return '低库存'
+  if ((item.available_quantity || 0) === 0) return '缺货'
+  if ((item.available_quantity || 0) < 10) return '低库存'
   return '正常'
 }
 </script>

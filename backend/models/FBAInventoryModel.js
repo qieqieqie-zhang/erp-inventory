@@ -39,15 +39,15 @@ class FBAInventoryModel extends BaseModel {
 
       // 批量插入新数据
       const keys = [
-        'snapshot_date', 'seller_sku', 'item_name', 'asin', 'fnsku', 
-        'condition_type', 'available_quantity', 'unavailable_quantity', 
+        'snapshot_date', 'seller_sku', 'item_name', 'asin', 'fnsku',
+        'condition_type', 'available_quantity', 'unavailable_quantity',
         'inbound_quantity', 'inbound_working', 'shipped_quantity',
         'received_quantity', 'total_reserved_quantity', 'unfulfillable_quantity',
-        'sales_last_7_days', 'sales_last_30_days', 'days_of_supply', 
+        'sales_last_7_days', 'sales_last_30_days', 'days_of_supply',
         'marketplace', 'fba_minimum_inventory_level', 'fba_inventory_level_health_status',
-        'recommended_ship_in_quantity', 'recommended_ship_in_date', 
-        'inventory_supply_at_fba', 'reserved_fc_transfer', 
-        'reserved_fc_processing', 'reserved_customer_order', 'upload_batch'
+        'recommended_ship_in_quantity', 'recommended_ship_in_date',
+        'inventory_supply_at_fba', 'reserved_fc_transfer',
+        'reserved_fc_processing', 'reserved_customer_order', 'your_price', 'upload_batch'
       ];
 
       const values = inventoryData.map(item => {
@@ -89,6 +89,7 @@ class FBAInventoryModel extends BaseModel {
           parseInt(item['Reserved FC Transfer'] || item.reserved_fc_transfer || 0),
           parseInt(item['Reserved FC Processing'] || item.reserved_fc_processing || 0),
           parseInt(item['Reserved Customer Order'] || item.reserved_customer_order || 0),
+          parseFloat(item['your-price'] || item.your_price || null),
           uploadBatch
         ];
       });
@@ -99,8 +100,15 @@ class FBAInventoryModel extends BaseModel {
 
       const flattenedValues = values.flat();
       const sql = `INSERT INTO amazon_fba_inventory (${keys.join(', ')}) VALUES ${placeholders}`;
-      
+
       const [result] = await connection.execute(sql, flattenedValues);
+
+      // 计算售出金额：your_price * sales_last_30_days
+      await connection.execute(`
+        UPDATE amazon_fba_inventory
+        SET sales_amount = COALESCE(your_price, 0) * sales_last_30_days
+        WHERE sales_amount IS NULL OR sales_amount = 0
+      `);
 
       await connection.commit();
 
