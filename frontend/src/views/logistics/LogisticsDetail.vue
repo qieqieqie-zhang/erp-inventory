@@ -260,8 +260,6 @@ const handleSyncProducts = async () => {
     syncLoading.value = false
   }
 }
-  }
-}
 
 const previewSkuFile = async (rawFile) => {
   const fd = new FormData()
