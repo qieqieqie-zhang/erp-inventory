@@ -2,174 +2,338 @@
   <el-dialog
     v-model="dialogVisible"
     title="FBA库存详情"
-    width="900px"
+    width="1050px"
     :close-on-click-modal="false"
+    class="inventory-detail-dialog"
   >
     <div v-if="data" class="detail-container">
-      <!-- 基本信息 -->
-      <el-divider content-position="left">基本信息</el-divider>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="SKU">{{ data.seller_sku || data.sku }}</el-descriptions-item>
-        <el-descriptions-item label="FNSKU">{{ data.fnsku }}</el-descriptions-item>
-        <el-descriptions-item label="ASIN">{{ data.asin }}</el-descriptions-item>
-        <el-descriptions-item label="商品名称" :span="2">{{ data.item_name }}</el-descriptions-item>
-        <el-descriptions-item label="商品状况">{{ data.condition_type }}</el-descriptions-item>
-        <el-descriptions-item label="站点">{{ data.marketplace }}</el-descriptions-item>
-      </el-descriptions>
+      <!-- 顶部摘要区 -->
+      <div class="detail-summary">
+        <div class="summary-header">
+          <div class="summary-sku">
+            <span class="label">SKU:</span>
+            <span class="value">{{ data.sku }}</span>
+          </div>
+          <div class="summary-asin">
+            <span class="label">ASIN:</span>
+            <span class="value">{{ data.asin }}</span>
+          </div>
+          <div class="summary-fnsku">
+            <span class="label">FNSKU:</span>
+            <span class="value">{{ data.fnsku }}</span>
+          </div>
+        </div>
 
-      <!-- 库存数量 -->
-      <el-divider content-position="left">库存数量</el-divider>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="可售数量">
-          <el-tag type="success">{{ data.available_quantity }}</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="预留转移">{{ data.reserved_fc_transfer }}</el-descriptions-item>
-        <el-descriptions-item label="预留处理中">{{ data.reserved_fc_processing }}</el-descriptions-item>
-        <el-descriptions-item label="预留买家订单">{{ data.reserved_customer_order }}</el-descriptions-item>
-        <el-descriptions-item label="总预留数量">{{ data.total_reserved_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="入库数量">{{ data.inbound_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="入库处理中">{{ data.inbound_working }}</el-descriptions-item>
-        <el-descriptions-item label="已发货在途">{{ data.shipped_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="已接收数量">{{ data.inbound_received || data.received_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="不可售数量">{{ data.unavailable_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="无法配送数量">{{ data.unfulfillable_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="待删除数量">{{ data.pending_removal_quantity }}</el-descriptions-item>
-      </el-descriptions>
+        <div class="summary-product">
+          <span class="product-name">{{ data.product_name }}</span>
+        </div>
 
-      <!-- 销售信息 -->
-      <el-divider content-position="left">销售信息</el-divider>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="单价(¥)">{{ formatCurrency(data.your_price) }}</el-descriptions-item>
-        <el-descriptions-item label="售出件数(30天)">{{ data.sales_last_30_days }}</el-descriptions-item>
-        <el-descriptions-item label="售出金额(¥)">{{ formatCurrency(data.sales_amount) }}</el-descriptions-item>
-        <el-descriptions-item label="7天销量">{{ data.sales_last_7_days || data.units_shipped_t7 }}</el-descriptions-item>
-        <el-descriptions-item label="30天销量">{{ data.sales_last_30_days || data.units_shipped_t30 }}</el-descriptions-item>
-        <el-descriptions-item label="60天销量">{{ data.sales_shipped_last_60_days || data.units_shipped_t60 }}</el-descriptions-item>
-        <el-descriptions-item label="90天销量">{{ data.sales_shipped_last_90_days || data.units_shipped_t90 }}</el-descriptions-item>
-        <el-descriptions-item label="销售排名">{{ data.sales_rank }}</el-descriptions-item>
-        <el-descriptions-item label="售出率">{{ data.sell_through }}</el-descriptions-item>
-      </el-descriptions>
+        <div class="summary-tags">
+          <el-tag
+            v-for="tag in data.inventoryTags || []"
+            :key="tag.label"
+            size="small"
+            :type="tag.type"
+          >
+            {{ tag.label }}
+          </el-tag>
+        </div>
 
-      <!-- 价格信息 -->
-      <el-divider content-position="left">价格信息</el-divider>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="您的价格">{{ formatCurrency(data.your_price) }}</el-descriptions-item>
-        <el-descriptions-item label="销售价格">{{ formatCurrency(data.sales_price) }}</el-descriptions-item>
-        <el-descriptions-item label="特色优惠价">{{ formatCurrency(data.featuredoffer_price) }}</el-descriptions-item>
-        <el-descriptions-item label="全新最低价(含运费)">{{ formatCurrency(data.lowest_price_new_plus_shipping) }}</el-descriptions-item>
-        <el-descriptions-item label="二手最低价">{{ formatCurrency(data.lowest_price_used) }}</el-descriptions-item>
-        <el-descriptions-item label="建议销售价格">{{ formatCurrency(data.recommended_sales_price) }}</el-descriptions-item>
-      </el-descriptions>
+        <div class="summary-stats">
+          <div class="stat-item">
+            <span class="stat-label">可售库存</span>
+            <span class="stat-value">{{ data.available || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">近30天销量</span>
+            <span class="stat-value">{{ data.units_shipped_t30 || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">可售天数</span>
+            <span class="stat-value" :class="getDaysClass(data.days_of_supply)">{{ data.days_of_supply || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">入库中</span>
+            <span class="stat-value">{{ data.inbound_quantity || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">预计过剩</span>
+            <span class="stat-value danger">{{ data.estimated_excess_quantity || 0 }}</span>
+          </div>
+        </div>
 
-      <!-- 库龄信息 -->
-      <el-divider content-position="left">库龄信息</el-divider>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="可供天数">{{ data.days_of_supply }}</el-descriptions-item>
-        <el-descriptions-item label="历史可供天数">{{ data.historical_days_of_supply }}</el-descriptions-item>
-        <el-descriptions-item label="含在途总可供天数">{{ data.total_days_supply_open_shipments }}</el-descriptions-item>
-        <el-descriptions-item label="0-30天">{{ data.inv_age_0_to_30_days }}</el-descriptions-item>
-        <el-descriptions-item label="31-60天">{{ data.inv_age_31_to_60_days }}</el-descriptions-item>
-        <el-descriptions-item label="61-90天">{{ data.inv_age_61_to_90_days }}</el-descriptions-item>
-        <el-descriptions-item label="91-180天">{{ data.inv_age_91_to_180_days }}</el-descriptions-item>
-        <el-descriptions-item label="181-270天">{{ data.inv_age_181_to_270_days }}</el-descriptions-item>
-        <el-descriptions-item label="271-365天">{{ data.inv_age_271_to_365_days }}</el-descriptions-item>
-        <el-descriptions-item label="366-455天">{{ data.inv_age_366_to_455_days }}</el-descriptions-item>
-        <el-descriptions-item label="456天以上">{{ data.inv_age_456_plus_days }}</el-descriptions-item>
-        <el-descriptions-item label="库龄快照日期">{{ data.inventory_age_snapshot_date }}</el-descriptions-item>
-      </el-descriptions>
+        <!-- 运营建议 -->
+        <div class="suggestion-box" :class="getSuggestionClass()">
+          <div class="suggestion-title">
+            <el-icon><InfoFilled /></el-icon>
+            运营建议
+          </div>
+          <div class="suggestion-content">
+            {{ data.operation_suggestion || '暂无建议' }}
+          </div>
+        </div>
+      </div>
 
-      <!-- 库存健康状态 -->
-      <el-divider content-position="left">库存健康状态</el-divider>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="预警状态">{{ data.alert }}</el-descriptions-item>
-        <el-descriptions-item label="FBA库存健康状态">{{ data.fba_inventory_level_health_status }}</el-descriptions-item>
-        <el-descriptions-item label="建议操作">{{ data.recommended_action }}</el-descriptions-item>
-        <el-descriptions-item label="建议补货量">{{ data.recommended_ship_in_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="建议发货日期">{{ data.recommended_ship_in_date }}</el-descriptions-item>
-        <el-descriptions-item label="预计过剩数量">{{ data.estimated_excess_quantity }}</el-descriptions-item>
-        <el-descriptions-item label="30天覆盖周数">{{ data.weeks_of_cover_t30 }}</el-descriptions-item>
-        <el-descriptions-item label="90天覆盖周数">{{ data.weeks_of_cover_t90 }}</el-descriptions-item>
-        <el-descriptions-item label="6个月无销售">{{ data.no_sale_last_6_months ? '是' : '否' }}</el-descriptions-item>
-        <el-descriptions-item label="豁免低库存费">{{ data.exempted_low_inventory_fee ? '是' : '否' }}</el-descriptions-item>
-      </el-descriptions>
+      <!-- Tab分组内容 -->
+      <el-tabs v-model="activeTab" class="detail-tabs">
+        <!-- 分组1：商品基础信息 -->
+        <el-tab-pane label="商品基础信息" name="basic">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="SKU">{{ data.sku }}</el-descriptions-item>
+            <el-descriptions-item label="FNSKU">{{ data.fnsku }}</el-descriptions-item>
+            <el-descriptions-item label="ASIN">{{ data.asin }}</el-descriptions-item>
+            <el-descriptions-item label="商品状况">{{ data.condition || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="站点">{{ data.marketplace || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="快照日期">{{ data.snapshot_date || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="最后更新">{{ formatDate(data.last_updated) }}</el-descriptions-item>
+            <el-descriptions-item label="商品名称" :span="2">{{ data.product_name || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
 
-      <!-- AIS 库存仓储费 -->
-      <el-divider content-position="left">AIS 库存仓储费</el-divider>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="181-210天数量">{{ data.quantity_ais_181_210_days }}</el-descriptions-item>
-        <el-descriptions-item label="181-210天估算">{{ formatCurrency(data.estimated_ais_181_210_days) }}</el-descriptions-item>
-        <el-descriptions-item label="211-240天数量">{{ data.quantity_ais_211_240_days }}</el-descriptions-item>
-        <el-descriptions-item label="211-240天估算">{{ formatCurrency(data.estimated_ais_211_240_days) }}</el-descriptions-item>
-        <el-descriptions-item label="241-270天数量">{{ data.quantity_ais_241_270_days }}</el-descriptions-item>
-        <el-descriptions-item label="241-270天估算">{{ formatCurrency(data.estimated_ais_241_270_days) }}</el-descriptions-item>
-        <el-descriptions-item label="271-300天数量">{{ data.quantity_ais_271_300_days }}</el-descriptions-item>
-        <el-descriptions-item label="271-300天估算">{{ formatCurrency(data.estimated_ais_271_300_days) }}</el-descriptions-item>
-        <el-descriptions-item label="301-330天数量">{{ data.quantity_ais_301_330_days }}</el-descriptions-item>
-        <el-descriptions-item label="301-330天估算">{{ formatCurrency(data.estimated_ais_301_330_days) }}</el-descriptions-item>
-        <el-descriptions-item label="331-365天数量">{{ data.quantity_ais_331_365_days }}</el-descriptions-item>
-        <el-descriptions-item label="331-365天估算">{{ formatCurrency(data.estimated_ais_331_365_days) }}</el-descriptions-item>
-        <el-descriptions-item label="366-455天数量">{{ data.quantity_ais_366_455_days }}</el-descriptions-item>
-        <el-descriptions-item label="366-455天估算">{{ formatCurrency(data.estimated_ais_366_455_days) }}</el-descriptions-item>
-        <el-descriptions-item label="456+天数量">{{ data.quantity_ais_456_plus_days }}</el-descriptions-item>
-        <el-descriptions-item label="456+天估算">{{ formatCurrency(data.estimated_ais_456_plus_days) }}</el-descriptions-item>
-      </el-descriptions>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="下月预计仓储费">{{ formatCurrency(data.estimated_storage_cost_next_month) }}</el-descriptions-item>
-        <el-descriptions-item label="FBA最低库存水平">{{ data.fba_minimum_inventory_level }}</el-descriptions-item>
-      </el-descriptions>
+        <!-- 分组2：库存实时状态 -->
+        <el-tab-pane label="库存实时状态" name="inventory">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="可售库存">
+              <span class="highlight-value">{{ data.available || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="移除中库存">{{ data.pending_removal_quantity || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="不可售库存">
+              <span :class="data.unfulfillable_quantity > 0 ? 'danger-text' : ''">{{ data.unfulfillable_quantity || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="仓间调拨保留">{{ data.reserved_fc_transfer || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="仓内处理中">{{ data.reserved_fc_processing || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="客户订单保留">{{ data.reserved_customer_order || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="总保留库存">
+              <span :class="data.total_reserved_quantity > 0 ? 'warning-text' : ''">{{ data.total_reserved_quantity || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="入库中库存">{{ data.inbound_quantity || 0 }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
 
-      <!-- 仓储信息 -->
-      <el-divider content-position="left">仓储信息</el-divider>
-      <el-descriptions :column="3" border>
-        <el-descriptions-item label="存储类型">{{ data.storage_type }}</el-descriptions-item>
-        <el-descriptions-item label="存储体积">{{ data.storage_volume }} {{ data.volume_unit_measurement }}</el-descriptions-item>
-        <el-descriptions-item label="商品体积">{{ data.item_volume }} {{ data.volume_unit_measurement }}</el-descriptions-item>
-        <el-descriptions-item label="货币">{{ data.currency }}</el-descriptions-item>
-        <el-descriptions-item label="产品组">{{ data.product_group }}</el-descriptions-item>
-        <el-descriptions-item label="供应商">{{ data.supplier }}</el-descriptions-item>
-      </el-descriptions>
+        <!-- 分组3：销售表现 -->
+        <el-tab-pane label="销售表现" name="sales">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="近7天销量">{{ data.units_shipped_t7 || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="近30天销量">{{ data.units_shipped_t30 || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="近60天销量">{{ data.units_shipped_t60 || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="近90天销量">{{ data.units_shipped_t90 || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="7天日均销量">{{ (data.daily_sales_t7 || 0).toFixed(2) }}</el-descriptions-item>
+            <el-descriptions-item label="30天日均销量">{{ (data.daily_sales_t30 || 0).toFixed(2) }}</el-descriptions-item>
+            <el-descriptions-item label="90天日均销量">{{ (data.daily_sales_t90 || 0).toFixed(2) }}</el-descriptions-item>
+            <el-descriptions-item label="销量趋势系数">
+              <span :class="getTrendClass(data.sales_trend_ratio)">{{ (data.sales_trend_ratio || 0).toFixed(2) }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="售出率">
+              {{ data.sell_through ? (data.sell_through * 100).toFixed(2) + '%' : '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="销售排名">{{ data.sales_rank || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
 
-      <!-- 季节性信息 -->
-      <el-divider content-position="left">季节性信息</el-divider>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="未来3个月季节性">{{ data.is_seasonal_next_3_months ? '是' : '否' }}</el-descriptions-item>
-        <el-descriptions-item label="季节名称">{{ data.season_name }}</el-descriptions-item>
-        <el-descriptions-item label="季节开始日期">{{ data.season_start_date }}</el-descriptions-item>
-        <el-descriptions-item label="季节结束日期">{{ data.season_end_date }}</el-descriptions-item>
-      </el-descriptions>
+        <!-- 分组4：价格与竞争 -->
+        <el-tab-pane label="价格与竞争" name="price">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="你的价格">
+              <span class="price-value">${{ formatNumber(data.your_price) }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="销售价格">${{ formatNumber(data.sales_price) }}</el-descriptions-item>
+            <el-descriptions-item label="购物车价格">${{ formatNumber(data.buybox_price) }}</el-descriptions-item>
+            <el-descriptions-item label="全新最低价(含运费)">${{ formatNumber(data.lowest_price_new_plus_shipping) }}</el-descriptions-item>
+            <el-descriptions-item label="二手最低价">${{ formatNumber(data.lowest_price_used) }}</el-descriptions-item>
+            <el-descriptions-item label="特色优惠价">${{ formatNumber(data.featuredoffer_price) }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
 
-      <!-- 其他信息 -->
-      <el-divider content-position="left">其他信息</el-divider>
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="快照日期">{{ data.snapshot_date }}</el-descriptions-item>
-        <el-descriptions-item label="历史天数最后更新">{{ data.last_updated_historical_days }}</el-descriptions-item>
-        <el-descriptions-item label="短期历史可供天数">{{ data.short_term_historical_days }}</el-descriptions-item>
-        <el-descriptions-item label="长期历史可供天数">{{ data.long_term_historical_days }}</el-descriptions-item>
-        <el-descriptions-item label="FBA现有库存">{{ data.inventory_supply_at_fba }}</el-descriptions-item>
-        <el-descriptions-item label="上传批次">{{ data.upload_batch }}</el-descriptions-item>
-      </el-descriptions>
+        <!-- 分组5：补货与在途 -->
+        <el-tab-pane label="补货与在途" name="replenish">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="可售天数">
+              <span :class="getDaysClass(data.days_of_supply)">{{ data.days_of_supply || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="历史可售天数">{{ data.historical_days_of_supply || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="含在途总库存">{{ data.total_available_with_inbound || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="含在途可售天数">{{ (data.estimated_cover_days_with_inbound || 0).toFixed(0) }}</el-descriptions-item>
+            <el-descriptions-item label="入库中库存">{{ data.inbound_quantity || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="FBA最低库存水平">{{ data.fba_minimum_inventory_level || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="建议发货数量">{{ data.recommended_ship_in_quantity || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="建议发货日期">{{ data.recommended_ship_in_date || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="30天覆盖周数">{{ data.weeks_of_cover_t30 || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="90天覆盖周数">{{ data.weeks_of_cover_t90 || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="FBA库存健康状态">
+              <el-tag size="small" :type="getHealthType(data.fba_inventory_level_health_status)">
+                {{ data.fba_inventory_level_health_status || '-' }}
+              </el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
+
+        <!-- 分组6：库龄与仓储费 -->
+        <el-tab-pane label="库龄与仓储费" name="age">
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="0-90天">{{ data.inv_age_0_to_90_days || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="91-180天">{{ data.inv_age_91_to_180_days || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="181-270天">
+              <span :class="(data.inv_age_181_to_270_days || 0) > 0 ? 'warning-text' : ''">{{ data.inv_age_181_to_270_days || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="271-365天">
+              <span :class="(data.inv_age_271_to_365_days || 0) > 0 ? 'danger-text' : ''">{{ data.inv_age_271_to_365_days || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="365天以上">
+              <span :class="(data.inv_age_456_plus_days || 0) > 0 ? 'danger-text' : ''">{{ data.inv_age_456_plus_days || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="181天以上库存">
+              <span class="highlight-value">{{ data.aged_inventory_181_plus || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="271天以上库存">
+              <span class="danger-text">{{ data.aged_inventory_271_plus || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="下月预计仓储费">
+              <span class="price-value">${{ formatNumber(data.estimated_storage_cost_next_month) }}</span>
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-divider content-position="left">库龄附加费</el-divider>
+          <el-descriptions :column="3" border size="small">
+            <el-descriptions-item label="181-210天数量">{{ data.quantity_ais_181_210_days || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="211-240天数量">{{ data.quantity_ais_211_240_days || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="241-270天数量">{{ data.quantity_ais_241_270_days || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="271-300天数量">{{ data.quantity_ais_271_300_days || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="301-330天数量">{{ data.quantity_ais_301_330_days || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="331-365天数量">{{ data.quantity_ais_331_365_days || 0 }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
+
+        <!-- 分组7：过剩与建议 -->
+        <el-tab-pane label="过剩与建议" name="excess">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="预计过剩库存">
+              <span :class="(data.estimated_excess_quantity || 0) > 0 ? 'danger-text' : ''">
+                {{ data.estimated_excess_quantity || 0 }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="过剩库存阈值">{{ data.excess_threshold || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="亚马逊建议动作" :span="2">{{ data.recommended_action || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="建议移除数量">{{ data.recommended_removal_quantity || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="预计节省成本">${{ formatNumber(data.estimated_cost_savings) }}</el-descriptions-item>
+            <el-descriptions-item label="库存提醒">{{ data.alert || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
+
+        <!-- 分组8：全部原始字段 -->
+        <el-tab-pane label="全部原始字段" name="raw">
+          <el-collapse v-model="rawExpanded">
+            <el-collapse-item title="点击展开全部原始字段" name="raw-fields">
+              <div class="raw-fields-grid">
+                <template v-for="(value, key) in data._raw || data" :key="key">
+                  <div v-if="!isSystemField(key)" class="raw-field-item">
+                    <span class="raw-field-key">{{ key }}</span>
+                    <span class="raw-field-value">{{ formatFieldValue(value) }}</span>
+                  </div>
+                </template>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </el-tab-pane>
+      </el-tabs>
     </div>
 
     <template #footer>
       <el-button @click="dialogVisible = false">关闭</el-button>
+      <el-button type="primary" @click="handleReplenish">发起补货</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { InfoFilled } from '@element-plus/icons-vue'
 
 const dialogVisible = ref(false)
 const data = ref(null)
+const activeTab = ref('basic')
+const rawExpanded = ref(false)
 
-const formatCurrency = (value) => {
-  if (value === undefined || value === null || value === '') return '-'
-  return parseFloat(value).toFixed(2)
+const formatNumber = (value) => {
+  if (value === undefined || value === null || value === '') return '0.00'
+  return parseFloat(value).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const formatFieldValue = (value) => {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'number') return value.toString()
+  return String(value)
+}
+
+const isSystemField = (key) => {
+  return ['inventoryTags', 'operation_suggestion', 'daily_sales_t7', 'daily_sales_t30',
+    'daily_sales_t90', 'sales_trend_ratio', 'total_available_with_inbound',
+    'estimated_cover_days_with_inbound', 'aged_inventory_181_plus', 'aged_inventory_271_plus', '_raw'].includes(key)
+}
+
+const getDaysClass = (days) => {
+  const d = parseInt(days) || 0
+  if (d === 0) return 'danger-text'
+  if (d < 20) return 'danger-text'
+  if (d < 45) return 'warning-text'
+  if (d > 90) return 'warning-text'
+  return ''
+}
+
+const getTrendClass = (ratio) => {
+  const r = parseFloat(ratio) || 0
+  if (r > 1.2) return 'success-text'
+  if (r < 0.8) return 'danger-text'
+  return ''
+}
+
+const getHealthType = (status) => {
+  if (!status) return 'info'
+  const s = status.toLowerCase()
+  if (s.includes('healthy')) return 'success'
+  if (s.includes('low stock')) return 'warning'
+  if (s.includes('excess') || s.includes('out of stock')) return 'danger'
+  return 'info'
+}
+
+const getSuggestionClass = () => {
+  const tags = (data.value?.inventoryTags || []).map(t => t.label)
+  if (tags.includes('断货风险') || tags.includes('Out of stock') || tags.includes('压货风险')) {
+    return 'suggestion-danger'
+  }
+  if (tags.includes('库龄风险') || tags.includes('高库龄风险') || tags.includes('不可售异常')) {
+    return 'suggestion-warning'
+  }
+  if (tags.includes('库存健康')) {
+    return 'suggestion-success'
+  }
+  return 'suggestion-info'
 }
 
 const open = (rowData) => {
   data.value = rowData
+  activeTab.value = 'basic'
+  rawExpanded.value = false
   dialogVisible.value = true
+}
+
+const handleReplenish = () => {
+  if (data.value) {
+    ElMessage.info(`发起补货：SKU=${data.value.sku}, ASIN=${data.value.asin}, 可售=${data.value.available}, 30天销量=${data.value.units_shipped_t30}`)
+  }
+  dialogVisible.value = false
 }
 
 defineExpose({ open })
@@ -177,11 +341,189 @@ defineExpose({ open })
 
 <style scoped>
 .detail-container {
-  max-height: 70vh;
+  max-height: 75vh;
   overflow-y: auto;
 }
 
+/* 摘要区样式 */
+.detail-summary {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-header {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+}
+
+.summary-sku,
+.summary-asin,
+.summary-fnsku {
+  font-size: 14px;
+}
+
+.summary-sku .label,
+.summary-asin .label,
+.summary-fnsku .label {
+  color: #909399;
+}
+
+.summary-sku .value,
+.summary-asin .value,
+.summary-fnsku .value {
+  font-weight: bold;
+  color: #303133;
+  margin-left: 4px;
+}
+
+.summary-product {
+  margin-bottom: 12px;
+}
+
+.summary-product .product-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 24px;
+  padding: 12px 0;
+  border-top: 1px solid #dcdfe6;
+  border-bottom: 1px solid #dcdfe6;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-item .stat-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.stat-item .stat-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #303133;
+}
+
+/* 运营建议框 */
+.suggestion-box {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border-left: 4px solid;
+}
+
+.suggestion-box.suggestion-danger {
+  background: #fef0f0;
+  border-left-color: #f56c6c;
+}
+
+.suggestion-box.suggestion-warning {
+  background: #fdf6ec;
+  border-left-color: #e6a23c;
+}
+
+.suggestion-box.suggestion-success {
+  background: #f0f9eb;
+  border-left-color: #67c23a;
+}
+
+.suggestion-box.suggestion-info {
+  background: #f4f4f5;
+  border-left-color: #909399;
+}
+
+.suggestion-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.suggestion-content {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.6;
+}
+
+/* Tab样式 */
+.detail-tabs {
+  margin-top: 16px;
+}
+
+/* 文字颜色 */
+.danger-text {
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+.warning-text {
+  color: #e6a23c;
+}
+
+.success-text {
+  color: #67c23a;
+}
+
+.highlight-value {
+  color: #409eff;
+  font-weight: bold;
+}
+
+.price-value {
+  color: #67c23a;
+  font-weight: bold;
+}
+
+/* 原始字段网格 */
+.raw-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.raw-field-item {
+  display: flex;
+  padding: 8px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.raw-field-key {
+  flex: 0 0 45%;
+  font-size: 12px;
+  color: #909399;
+  word-break: break-all;
+}
+
+.raw-field-value {
+  flex: 0 0 55%;
+  font-size: 12px;
+  color: #303133;
+  word-break: break-all;
+  padding-left: 8px;
+}
+
 .el-divider {
-  margin: 16px 0 12px;
+  margin: 16px 0;
 }
 </style>

@@ -179,34 +179,44 @@ class FBAInventoryController {
         FBAInventoryModel.countInventory(options)
       ]);
 
-      // 映射字段以适配前端
-      const mappedInventory = inventory.map(item => ({
-        sku: item.seller_sku,
-        product_name: item.item_name,
-        fnsku: item.fnsku,
-        asin: item.asin,
-        total_units: (item.available_quantity || 0) + (item.total_reserved_quantity || 0) + (item.inbound_quantity || 0),
-        sellable_units: item.available_quantity || 0,
-        reserved_units: item.total_reserved_quantity || 0,
-        inbound_units: item.inbound_quantity || 0,
-        unit_value: 0, // 数据库中暂时没有单价
-        total_value: 0,
-        warehouse_code: 'FBA',
-        country: item.marketplace,
-        inventory_age_days: item.days_of_supply || 0, // 暂时用可供天数代替
-        condition: item.condition_type || '全新',
-        last_updated: item.upload_time,
-        // 新增字段
-        snapshot_date: item.snapshot_date,
-        fba_minimum_inventory_level: item.fba_minimum_inventory_level,
-        fba_inventory_level_health_status: item.fba_inventory_level_health_status,
-        recommended_ship_in_quantity: item.recommended_ship_in_quantity,
-        recommended_ship_in_date: item.recommended_ship_in_date,
-        inventory_supply_at_fba: item.inventory_supply_at_fba,
-        reserved_fc_transfer: item.reserved_fc_transfer,
-        reserved_fc_processing: item.reserved_fc_processing,
-        reserved_customer_order: item.reserved_customer_order
-      }));
+      // 映射字段以适配前端（返回原始字段，前端计算衍生字段）
+      const mappedInventory = inventory.map(item => {
+        // 返回所有原始字段
+        const mapped = { ...item };
+
+        // 添加常用映射
+        mapped.sku = item.seller_sku;
+        mapped.product_name = item.item_name;
+        mapped.fnsku = item.fnsku;
+        mapped.asin = item.asin;
+        mapped.available = item.available_quantity;
+        mapped.units_shipped_t7 = item.sales_last_7_days || item.units_shipped_t7;
+        mapped.units_shipped_t30 = item.sales_last_30_days || item.units_shipped_t30;
+        mapped.units_shipped_t60 = item.sales_shipped_last_60_days || item.units_shipped_t60;
+        mapped.units_shipped_t90 = item.sales_shipped_last_90_days || item.units_shipped_t90;
+        mapped.days_of_supply = item.days_of_supply;
+        mapped.sell_through = item.sell_through;
+        mapped.inbound_quantity = item.inbound_quantity;
+        mapped.total_reserved_quantity = item.total_reserved_quantity;
+        mapped.unfulfillable_quantity = item.unfulfillable_quantity;
+        mapped.estimated_excess_quantity = item.estimated_excess_quantity;
+        mapped.estimated_storage_cost_next_month = item.estimated_storage_cost_next_month;
+        mapped.fba_inventory_level_health_status = item.fba_inventory_level_health_status;
+        mapped.last_updated = item.upload_time || item.snapshot_date;
+        mapped.snapshot_date = item.snapshot_date;
+        mapped.inv_age_181_to_270_days = item.inv_age_181_to_270_days;
+        mapped.inv_age_271_to_365_days = item.inv_age_271_to_365_days;
+        mapped.inv_age_456_plus_days = item.inv_age_456_plus_days;
+        mapped.weeks_of_cover_t30 = item.weeks_of_cover_t30;
+        mapped.fba_minimum_inventory_level = item.fba_minimum_inventory_level;
+        mapped.reserved_fc_transfer = item.reserved_fc_transfer;
+        mapped.reserved_fc_processing = item.reserved_fc_processing;
+        mapped.reserved_customer_order = item.reserved_customer_order;
+        mapped.condition = item.condition_type;
+        mapped.marketplace = item.marketplace;
+
+        return mapped;
+      });
 
       // 获取站点列表（用于筛选器）
       const marketplaces = await FBAInventoryModel.query(

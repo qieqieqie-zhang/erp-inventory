@@ -2,7 +2,7 @@
   <div class="fba-inventory-container">
     <!-- 页面头部 -->
     <div class="page-header">
-      <h2>FBA库存管理</h2>
+      <h2>FBA库存健康分析</h2>
       <div class="header-actions">
         <el-button type="primary" :icon="Upload" @click="showUploadDialog">
           上传库存报告
@@ -10,10 +10,10 @@
         <el-button :icon="Refresh" @click="refreshData">
           刷新
         </el-button>
-        <el-button type="success" :icon="Download" @click="exportData">
+        <el-button type="success" :icon="Download" @click="exportFilteredData">
           导出数据
         </el-button>
-        <el-button :icon="View" @click="viewAlerts">
+        <el-button type="warning" :icon="Warning" @click="viewAlerts">
           库存预警
         </el-button>
         <el-button type="danger" :icon="DeleteFilled" @click="deleteAll">
@@ -22,7 +22,7 @@
       </div>
     </div>
 
-    <!-- 库存概览 -->
+    <!-- 库存健康概览 -->
     <div class="inventory-overview">
       <el-row :gutter="20">
         <el-col :span="6">
@@ -32,39 +32,27 @@
                 <el-icon><Box /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">{{ overviewData.totalUnits || 0 }}</div>
-                <div class="overview-label">总库存数量</div>
-                <div class="overview-change">
-                  <span :class="getTrendClass(overviewData.unitsChange)">
-                    {{ formatPercentage(overviewData.unitsChange) }}
-                  </span>
-                  <span class="overview-hint">较上月</span>
-                </div>
+                <div class="overview-value">{{ overviewData.totalAvailable || 0 }}</div>
+                <div class="overview-label">可售库存总数</div>
               </div>
             </div>
           </el-card>
         </el-col>
-        
+
         <el-col :span="6">
-          <el-card shadow="never" class="overview-card total-value">
+          <el-card shadow="never" class="overview-card total-sales">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><Money /></el-icon>
+                <el-icon><TrendCharts /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">¥{{ formatCurrency(overviewData.totalValue || 0) }}</div>
-                <div class="overview-label">库存总价值</div>
-                <div class="overview-change">
-                  <span :class="getTrendClass(overviewData.valueChange)">
-                    {{ formatPercentage(overviewData.valueChange) }}
-                  </span>
-                  <span class="overview-hint">较上月</span>
-                </div>
+                <div class="overview-value">{{ overviewData.totalSales30Days || 0 }}</div>
+                <div class="overview-label">近30天总销量</div>
               </div>
             </div>
           </el-card>
         </el-col>
-        
+
         <el-col :span="6">
           <el-card shadow="never" class="overview-card low-stock">
             <div class="overview-item">
@@ -72,33 +60,59 @@
                 <el-icon><Warning /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">{{ overviewData.lowStockCount || 0 }}</div>
-                <div class="overview-label">低库存商品</div>
-                <div class="overview-change">
-                  <el-tag size="small" :type="overviewData.lowStockCount > 10 ? 'danger' : 'warning'">
-                    {{ overviewData.lowStockCount > 0 ? '需补货' : '正常' }}
-                  </el-tag>
-                </div>
+                <div class="overview-value">{{ overviewData.outOfStockRisk || 0 }}</div>
+                <div class="overview-label">断货风险商品</div>
               </div>
             </div>
           </el-card>
         </el-col>
-        
+
         <el-col :span="6">
-          <el-card shadow="never" class="overview-card avg-age">
+          <el-card shadow="never" class="overview-card excess-stock">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><Clock /></el-icon>
+                <el-icon><Goods /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">{{ overviewData.avgAgeDays || 0 }}天</div>
-                <div class="overview-label">库龄平均值</div>
-                <div class="overview-change">
-                  <span :class="getAgeClass(overviewData.avgAgeDays)">
-                    {{ getAgeStatus(overviewData.avgAgeDays) }}
-                  </span>
-                </div>
+                <div class="overview-value">{{ formatNumber(overviewData.totalExcessQuantity || 0) }}</div>
+                <div class="overview-label">预计过剩库存</div>
               </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <!-- 第二行小卡片 -->
+      <el-row :gutter="20" style="margin-top: 20px;">
+        <el-col :span="6">
+          <el-card shadow="never" class="overview-card-small">
+            <div class="overview-item-small">
+              <span class="overview-label-small">入库中库存</span>
+              <span class="overview-value-small">{{ overviewData.totalInbound || 0 }}</span>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="never" class="overview-card-small">
+            <div class="overview-item-small">
+              <span class="overview-label-small">不可售库存</span>
+              <span class="overview-value-small">{{ overviewData.totalUnfulfillable || 0 }}</span>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="never" class="overview-card-small">
+            <div class="overview-item-small">
+              <span class="overview-label-small">库龄风险商品</span>
+              <span class="overview-value-small warning">{{ overviewData.ageRiskCount || 0 }}</span>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="6">
+          <el-card shadow="never" class="overview-card-small">
+            <div class="overview-item-small">
+              <span class="overview-label-small">下月预计仓储费</span>
+              <span class="overview-value-small">${{ formatNumber(overviewData.totalStorageCost || 0) }}</span>
             </div>
           </el-card>
         </el-col>
@@ -128,12 +142,21 @@
             />
           </el-form-item>
           <el-form-item label="库存状态">
-            <el-select v-model="filterForm.stockStatus" placeholder="全部状态" clearable>
-              <el-option label="全部" value="" />
-              <el-option label="正常" value="normal" />
-              <el-option label="低库存" value="low" />
-              <el-option label="缺货" value="out" />
-              <el-option label="积压" value="overstock" />
+            <el-select v-model="filterForm.stockStatus" placeholder="全部状态" clearable multiple collapse-tags>
+              <el-option label="断货风险" value="断货风险" />
+              <el-option label="库存偏紧" value="库存偏紧" />
+              <el-option label="库存健康" value="库存健康" />
+              <el-option label="库存偏多" value="库存偏多" />
+              <el-option label="压货风险" value="压货风险" />
+              <el-option label="无销量库存" value="无销量库存" />
+              <el-option label="不可售异常" value="不可售异常" />
+              <el-option label="库龄风险" value="库龄风险" />
+              <el-option label="高库龄风险" value="高库龄风险" />
+              <el-option label="有在途库存" value="有在途库存" />
+              <el-option label="Out of stock" value="Out of stock" />
+              <el-option label="Excess" value="Excess" />
+              <el-option label="Low stock" value="Low stock" />
+              <el-option label="Healthy" value="Healthy" />
             </el-select>
           </el-form-item>
           <el-form-item label="库龄(天)">
@@ -168,57 +191,43 @@
         <!-- 高级筛选 -->
         <el-collapse-transition>
           <div v-show="showAdvancedFilter" class="advanced-filter">
-            <el-form :model="advancedFilterForm" label-width="100px" :inline="true">
-              <el-form-item label="仓库代码">
+            <el-form :model="advancedFilterForm" label-width="120px" :inline="true">
+              <el-form-item label="ASIN/FNSKU">
                 <el-input
-                  v-model="advancedFilterForm.warehouseCode"
-                  placeholder="仓库代码"
+                  v-model="advancedFilterForm.asinFnsku"
+                  placeholder="输入ASIN或FNSKU"
                   clearable
                 />
               </el-form-item>
-              <el-form-item label="可售数量">
-                <el-input-number
-                  v-model="advancedFilterForm.minSellable"
-                  :min="0"
-                  placeholder="最小"
-                  controls-position="right"
-                  style="width: 100px;"
-                />
-                <span class="input-separator">-</span>
-                <el-input-number
-                  v-model="advancedFilterForm.maxSellable"
-                  :min="advancedFilterForm.minSellable || 0"
-                  placeholder="最大"
-                  controls-position="right"
-                  style="width: 100px;"
-                />
+              <el-form-item label="近30天有销量">
+                <el-checkbox v-model="advancedFilterForm.hasSales30Days" />
               </el-form-item>
-              <el-form-item label="预留数量">
-                <el-input-number
-                  v-model="advancedFilterForm.minReserved"
-                  :min="0"
-                  placeholder="最小"
-                  controls-position="right"
-                  style="width: 100px;"
-                />
-                <span class="input-separator">-</span>
-                <el-input-number
-                  v-model="advancedFilterForm.maxReserved"
-                  :min="advancedFilterForm.minReserved || 0"
-                  placeholder="最大"
-                  controls-position="right"
-                  style="width: 100px;"
-                />
+              <el-form-item label="近30天无销量">
+                <el-checkbox v-model="advancedFilterForm.noSales30Days" />
               </el-form-item>
-              <el-form-item label="入库时间">
-                <el-date-picker
-                  v-model="advancedFilterForm.receivedDateRange"
-                  type="daterange"
-                  range-separator="至"
-                  start-placeholder="开始日期"
-                  end-placeholder="结束日期"
-                  value-format="YYYY-MM-DD"
-                />
+              <el-form-item label="需要补货">
+                <el-checkbox v-model="advancedFilterForm.needReplenish" />
+              </el-form-item>
+              <el-form-item label="有在途库存">
+                <el-checkbox v-model="advancedFilterForm.hasInbound" />
+              </el-form-item>
+              <el-form-item label="无在途库存">
+                <el-checkbox v-model="advancedFilterForm.noInbound" />
+              </el-form-item>
+              <el-form-item label="预计过剩库存">
+                <el-checkbox v-model="advancedFilterForm.hasExcess" />
+              </el-form-item>
+              <el-form-item label="有不可售库存">
+                <el-checkbox v-model="advancedFilterForm.hasUnfulfillable" />
+              </el-form-item>
+              <el-form-item label="有保留库存">
+                <el-checkbox v-model="advancedFilterForm.hasReserved" />
+              </el-form-item>
+              <el-form-item label="181天以上库龄">
+                <el-checkbox v-model="advancedFilterForm.hasAged181Plus" />
+              </el-form-item>
+              <el-form-item label="271天以上库龄">
+                <el-checkbox v-model="advancedFilterForm.hasAged271Plus" />
               </el-form-item>
               <el-form-item>
                 <el-button @click="applyAdvancedFilter">应用筛选</el-button>
@@ -245,22 +254,6 @@
               <el-icon><Menu /></el-icon> 卡片
             </el-button>
           </el-button-group>
-          <el-dropdown @command="handleColumnCommand" style="margin-left: 10px;">
-            <el-button size="small">
-              <el-icon><Operation /></el-icon> 列设置
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item v-for="col in columnOptions" :key="col.prop">
-                  <el-checkbox
-                    v-model="col.visible"
-                    :label="col.label"
-                    @change="handleColumnVisibilityChange(col)"
-                  />
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
         </div>
       </div>
 
@@ -274,84 +267,183 @@
           border
           @sort-change="handleSortChange"
         >
+          <!-- 库存状态标签 -->
           <el-table-column
-            v-if="visibleColumns.sku"
+            prop="inventory_status"
+            label="库存状态"
+            width="180"
+            fixed
+          >
+            <template #default="{ row }">
+              <div class="inventory-tags">
+                <el-tag
+                  v-for="tag in row.inventoryTags || []"
+                  :key="tag.label"
+                  size="small"
+                  :type="tag.type"
+                  class="inventory-tag"
+                >
+                  {{ tag.label }}
+                </el-tag>
+              </div>
+            </template>
+          </el-table-column>
+
+          <!-- SKU -->
+          <el-table-column
             prop="sku"
             label="SKU"
-            width="120"
+            width="130"
             sortable
             fixed
           />
+
+          <!-- 商品名称 -->
           <el-table-column
-            v-if="visibleColumns.product_name"
             prop="product_name"
             label="商品名称"
             min-width="200"
             show-overflow-tooltip
           />
+
+          <!-- FNSKU -->
           <el-table-column
-            v-if="visibleColumns.fnsku"
             prop="fnsku"
             label="FNSKU"
-            width="120"
+            width="100"
           />
+
+          <!-- ASIN -->
           <el-table-column
-            v-if="visibleColumns.asin"
             prop="asin"
             label="ASIN"
             width="120"
           />
+
+          <!-- 可售库存 -->
           <el-table-column
-            v-if="visibleColumns.total_units"
-            prop="total_units"
-            label="库存数量"
+            prop="available"
+            label="可售库存"
             width="100"
             align="center"
             sortable
           >
             <template #default="{ row }">
-              <el-tag size="small" :type="getStockTagType(row)">
-                {{ row.total_units }}
-              </el-tag>
+              <span :class="getAvailableClass(row)">{{ row.available || 0 }}</span>
             </template>
           </el-table-column>
+
+          <!-- 近7天销量 -->
           <el-table-column
-            v-if="visibleColumns.your_price"
-            prop="your_price"
-            label="单价(¥)"
-            width="100"
-            align="right"
-            sortable
-          >
-            <template #default="{ row }">
-              {{ formatCurrency(row.your_price) }}
-            </template>
-          </el-table-column>
-          <el-table-column
-            v-if="visibleColumns.sales_last_30_days"
-            prop="sales_last_30_days"
-            label="售出件数"
+            prop="units_shipped_t7"
+            label="近7天销量"
             width="100"
             align="center"
             sortable
           />
+
+          <!-- 近30天销量 -->
           <el-table-column
-            v-if="visibleColumns.sales_amount"
-            prop="sales_amount"
-            label="售出金额(¥)"
-            width="120"
-            align="right"
+            prop="units_shipped_t30"
+            label="近30天销量"
+            width="100"
+            align="center"
+            sortable
+          />
+
+          <!-- 可售天数 -->
+          <el-table-column
+            prop="days_of_supply"
+            label="可售天数"
+            width="90"
+            align="center"
             sortable
           >
             <template #default="{ row }">
-              {{ formatCurrency(row.sales_amount) }}
+              <span :class="getDaysOfSupplyClass(row)">{{ row.days_of_supply || 0 }}</span>
             </template>
           </el-table-column>
+
+          <!-- 售出率 -->
           <el-table-column
-            v-if="visibleColumns.fba_inventory_level_health_status"
+            prop="sell_through"
+            label="售出率"
+            width="80"
+            align="center"
+            sortable
+          >
+            <template #default="{ row }">
+              {{ row.sell_through ? (row.sell_through * 100).toFixed(2) + '%' : '-' }}
+            </template>
+          </el-table-column>
+
+          <!-- 入库中库存 -->
+          <el-table-column
+            prop="inbound_quantity"
+            label="入库中"
+            width="90"
+            align="center"
+            sortable
+          />
+
+          <!-- 保留库存 -->
+          <el-table-column
+            prop="total_reserved_quantity"
+            label="保留库存"
+            width="90"
+            align="center"
+            sortable
+          />
+
+          <!-- 不可售库存 -->
+          <el-table-column
+            prop="unfulfillable_quantity"
+            label="不可售"
+            width="90"
+            align="center"
+            sortable
+          >
+            <template #default="{ row }">
+              <span v-if="row.unfulfillable_quantity > 0" class="warning-text">
+                {{ row.unfulfillable_quantity }}
+              </span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+
+          <!-- 预计过剩库存 -->
+          <el-table-column
+            prop="estimated_excess_quantity"
+            label="预计过剩"
+            width="90"
+            align="center"
+            sortable
+          >
+            <template #default="{ row }">
+              <span v-if="row.estimated_excess_quantity > 0" class="danger-text">
+                {{ row.estimated_excess_quantity }}
+              </span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+
+          <!-- 下月预计仓储费 -->
+          <el-table-column
+            prop="estimated_storage_cost_next_month"
+            label="下月仓储费"
+            width="100"
+            align="right"
+          >
+            <template #default="{ row }">
+              {{ row.estimated_storage_cost_next_month ? '$' + formatNumber(row.estimated_storage_cost_next_month) : '-' }}
+            </template>
+          </el-table-column>
+
+          <!-- FBA库存健康状态 -->
+          <el-table-column
             prop="fba_inventory_level_health_status"
-            label="FBA库存健康状态"
-            width="130"
+            label="FBA健康状态"
+            width="120"
           >
             <template #default="{ row }">
               <el-tag size="small" :type="getHealthStatusType(row.fba_inventory_level_health_status)">
@@ -359,17 +451,20 @@
               </el-tag>
             </template>
           </el-table-column>
+
+          <!-- 最后更新 -->
           <el-table-column
-            v-if="visibleColumns.last_updated"
             prop="last_updated"
             label="最后更新"
-            width="180"
+            width="160"
             sortable
           >
             <template #default="{ row }">
-              {{ formatDateTime(row.last_updated) }}
+              {{ formatDate(row.last_updated || row.snapshot_date) }}
             </template>
           </el-table-column>
+
+          <!-- 操作 -->
           <el-table-column label="操作" width="150" fixed="right">
             <template #default="{ row }">
               <el-button type="text" size="small" @click="viewDetail(row)">
@@ -378,19 +473,6 @@
               <el-button type="text" size="small" @click="createReplenishment(row)">
                 补货
               </el-button>
-              <el-dropdown @command="(command) => handleMoreCommand(row, command)" trigger="click">
-                <el-button type="text" size="small">
-                  更多 <el-icon><ArrowDown /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="transfer">库存转移</el-dropdown-item>
-                    <el-dropdown-item command="adjustment">库存调整</el-dropdown-item>
-                    <el-dropdown-item command="history">历史记录</el-dropdown-item>
-                    <el-dropdown-item command="export" divided>导出商品</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
             </template>
           </el-table-column>
         </el-table>
@@ -412,59 +494,49 @@
               <template #header>
                 <div class="card-header">
                   <div class="sku">{{ item.sku }}</div>
-                  <el-tag size="small" :type="getStockStatusType(item)">
-                    {{ getStockStatusText(item) }}
-                  </el-tag>
+                  <div class="inventory-tags">
+                    <el-tag
+                      v-for="tag in (item.inventoryTags || []).slice(0, 2)"
+                      :key="tag.label"
+                      size="small"
+                      :type="tag.type"
+                    >
+                      {{ tag.label }}
+                    </el-tag>
+                  </div>
                 </div>
               </template>
-              
+
               <div class="card-content">
                 <div class="product-name">{{ item.product_name }}</div>
-                
+
                 <div class="inventory-stats">
                   <div class="stat-item">
-                    <span class="stat-label">总库存:</span>
-                    <span class="stat-value">{{ item.total_units }}</span>
+                    <span class="stat-label">可售:</span>
+                    <span class="stat-value">{{ item.available || 0 }}</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-label">单价:</span>
-                    <span class="stat-value">{{ formatCurrency(item.your_price) }}</span>
+                    <span class="stat-label">7天销量:</span>
+                    <span class="stat-value">{{ item.units_shipped_t7 || 0 }}</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-label">售出件数:</span>
-                    <span class="stat-value">{{ item.sales_last_30_days }}</span>
+                    <span class="stat-label">30天销量:</span>
+                    <span class="stat-value">{{ item.units_shipped_t30 || 0 }}</span>
                   </div>
                   <div class="stat-item">
-                    <span class="stat-label">售出金额:</span>
-                    <span class="stat-value">{{ formatCurrency(item.sales_amount) }}</span>
+                    <span class="stat-label">可售天数:</span>
+                    <span class="stat-value" :class="getDaysOfSupplyClass(item)">{{ item.days_of_supply || 0 }}</span>
                   </div>
                 </div>
 
-                <div class="additional-info">
-                  <div class="info-item">
-                    <el-icon><Location /></el-icon>
-                    <span>{{ item.country || item.marketplace || '未知' }}</span>
-                  </div>
-                  <div class="info-item">
-                    <el-icon><Clock /></el-icon>
-                    <span :class="getAgeClass(item.inventory_age_days)">
-                      库龄: {{ item.inventory_age_days }}天
-                    </span>
-                  </div>
-                  <div class="info-item">
-                    <el-icon><Money /></el-icon>
-                    <span>价值: {{ formatCurrency(item.total_value) }}</span>
-                  </div>
+                <div class="card-actions">
+                  <el-button type="text" size="small" @click="viewDetail(item)">
+                    详情
+                  </el-button>
+                  <el-button type="text" size="small" @click="createReplenishment(item)">
+                    补货
+                  </el-button>
                 </div>
-              </div>
-              
-              <div class="card-actions">
-                <el-button type="text" size="small" @click="viewDetail(item)">
-                  详情
-                </el-button>
-                <el-button type="text" size="small" @click="createReplenishment(item)">
-                  补货
-                </el-button>
               </div>
             </el-card>
           </el-col>
@@ -496,43 +568,32 @@
       @success="handleUploadSuccess"
     />
 
-    <!-- 库存预警对话框 -->
-    <el-dialog
-      v-model="alertsDialogVisible"
-      title="库存预警"
-      width="800px"
-    >
-      <InventoryAlerts @close="alertsDialogVisible = false" />
-    </el-dialog>
-
     <!-- 库存详情对话框 -->
     <InventoryDetail ref="inventoryDetailRef" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Upload,
   Refresh,
   Download,
-  View,
   Box,
   Money,
   Warning,
   Clock,
   Grid,
   Menu,
-  Operation,
   ArrowDown,
   ArrowUp,
-  Location,
-  DeleteFilled
+  DeleteFilled,
+  TrendCharts,
+  Goods
 } from '@element-plus/icons-vue'
 import { apiService } from '../../utils/api'
 import UploadDialog from '../../components/UploadDialog.vue'
-import InventoryAlerts from './components/InventoryAlerts.vue'
 import InventoryDetail from './components/InventoryDetail.vue'
 
 // 数据状态
@@ -547,18 +608,23 @@ const viewMode = ref('table')
 const filterForm = ref({
   sku: '',
   productName: '',
-  stockStatus: '',
+  stockStatus: [],
   minAge: null,
   maxAge: null
 })
 
 const advancedFilterForm = ref({
-  warehouseCode: '',
-  minSellable: null,
-  maxSellable: null,
-  minReserved: null,
-  maxReserved: null,
-  receivedDateRange: []
+  asinFnsku: '',
+  hasSales30Days: false,
+  noSales30Days: false,
+  needReplenish: false,
+  hasInbound: false,
+  noInbound: false,
+  hasExcess: false,
+  hasUnfulfillable: false,
+  hasReserved: false,
+  hasAged181Plus: false,
+  hasAged271Plus: false
 })
 
 const showAdvancedFilter = ref(false)
@@ -566,44 +632,18 @@ const showAdvancedFilter = ref(false)
 // 分页配置
 const pagination = ref({
   currentPage: 1,
-  pageSize: 20,
+  pageSize: 50,
   total: 0
 })
 
 // 排序配置
 const sortConfig = ref({
-  prop: 'last_updated',
-  order: 'descending'
-})
-
-// 列设置
-const columnOptions = ref([
-  { prop: 'sku', label: 'SKU', visible: true },
-  { prop: 'product_name', label: '商品名称', visible: true },
-  { prop: 'fnsku', label: 'FNSKU', visible: true },
-  { prop: 'asin', label: 'ASIN', visible: true },
-  { prop: 'total_units', label: '库存数量', visible: true },
-  { prop: 'your_price', label: '单价', visible: true },
-  { prop: 'sales_last_30_days', label: '售出件数', visible: true },
-  { prop: 'sales_amount', label: '售出金额', visible: true },
-  { prop: 'fba_inventory_level_health_status', label: 'FBA库存健康状态', visible: true },
-  { prop: 'country', label: '国家', visible: false },
-  { prop: 'inventory_age_days', label: '库龄', visible: false },
-  { prop: 'condition', label: '商品状况', visible: false },
-  { prop: 'last_updated', label: '最后更新', visible: true }
-])
-
-const visibleColumns = computed(() => {
-  const columns = {}
-  columnOptions.value.forEach(col => {
-    columns[col.prop] = col.visible
-  })
-  return columns
+  prop: 'days_of_supply',
+  order: 'ascending'
 })
 
 // 对话框控制
 const uploadDialogVisible = ref(false)
-const alertsDialogVisible = ref(false)
 const inventoryDetailRef = ref(null)
 
 // 打开上传对话框
@@ -617,6 +657,223 @@ onMounted(() => {
   fetchOverviewData()
 })
 
+// 解析数值
+const parseNumber = (value) => {
+  if (value === null || value === undefined || value === '') return 0
+  return Number(String(value).replace(/[$,%]/g, '').replace(/,/g, '').trim()) || 0
+}
+
+// 格式化数字
+const formatNumber = (value) => {
+  if (value === undefined || value === null) return '0'
+  return parseFloat(value).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// 格式化日期
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 获取库存状态标签
+const getInventoryTags = (row) => {
+  const tags = []
+  const daysOfSupply = parseNumber(row.days_of_supply)
+  const available = parseNumber(row.available)
+  const unitsShippedT30 = parseNumber(row.units_shipped_t30)
+  const estimatedExcess = parseNumber(row.estimated_excess_quantity)
+  const weeksOfCoverT30 = parseNumber(row.weeks_of_cover_t30)
+  const unfulfillable = parseNumber(row.unfulfillable_quantity)
+  const totalReserved = parseNumber(row.total_reserved_quantity)
+  const inbound = parseNumber(row.inbound_quantity)
+  const fbaMinLevel = parseNumber(row.fba_minimum_inventory_level)
+  const invAge181270 = parseNumber(row.inv_age_181_to_270_days)
+  const invAge271365 = parseNumber(row.inv_age_271_to_365_days)
+  const invAge365Plus = parseNumber(row.inv_age_456_plus_days)
+  const fbaStatus = row.fba_inventory_level_health_status || ''
+
+  // 规则1：断货风险
+  if (daysOfSupply > 0 && daysOfSupply < 20 && unitsShippedT30 > 0) {
+    tags.push({ label: '断货风险', type: 'danger' })
+  }
+
+  // 规则2：库存偏紧
+  if (daysOfSupply >= 20 && daysOfSupply < 45 && unitsShippedT30 > 0) {
+    tags.push({ label: '库存偏紧', type: 'warning' })
+  }
+
+  // 规则3：库存健康
+  if (daysOfSupply >= 45 && daysOfSupply <= 90 && unitsShippedT30 > 0 && estimatedExcess <= 0) {
+    tags.push({ label: '库存健康', type: 'success' })
+  }
+
+  // 规则4：库存偏多
+  if (daysOfSupply > 90 && unitsShippedT30 > 0) {
+    tags.push({ label: '库存偏多', type: 'warning' })
+  }
+
+  // 规则5：压货风险
+  if (estimatedExcess > 0 || weeksOfCoverT30 > 12) {
+    tags.push({ label: '压货风险', type: 'danger' })
+  }
+
+  // 规则6：无销量库存
+  if (available > 0 && unitsShippedT30 === 0) {
+    tags.push({ label: '无销量库存', type: 'info' })
+  }
+
+  // 规则7：不可售异常
+  if (unfulfillable > 0) {
+    tags.push({ label: '不可售异常', type: 'danger' })
+  }
+
+  // 规则8：保留库存偏高
+  if (totalReserved > available * 0.5 && totalReserved > 10) {
+    tags.push({ label: '保留库存偏高', type: 'warning' })
+  }
+
+  // 规则9：库龄风险
+  if (invAge181270 + invAge271365 + invAge365Plus > 0) {
+    tags.push({ label: '库龄风险', type: 'danger' })
+  }
+
+  // 规则10：高库龄风险
+  if (invAge271365 + invAge365Plus > 0) {
+    tags.push({ label: '高库龄风险', type: 'danger' })
+  }
+
+  // 规则11：有在途库存
+  if (inbound > 0) {
+    tags.push({ label: '有在途库存', type: 'primary' })
+  }
+
+  // 规则12：低于FBA最低库存
+  if (fbaMinLevel > 0 && available < fbaMinLevel) {
+    tags.push({ label: '低于FBA最低', type: 'warning' })
+  }
+
+  // 规则13：Out of stock
+  if (fbaStatus.toLowerCase() === 'out of stock' || (available === 0 && unitsShippedT30 > 0)) {
+    tags.push({ label: 'Out of stock', type: 'danger' })
+  }
+
+  // 规则14：Excess
+  if (fbaStatus.toLowerCase() === 'excess' || estimatedExcess > 0) {
+    tags.push({ label: 'Excess', type: 'danger' })
+  }
+
+  // 规则15：Low stock
+  if (fbaStatus.toLowerCase() === 'low stock') {
+    tags.push({ label: 'Low stock', type: 'warning' })
+  }
+
+  // 规则16：Healthy
+  if (fbaStatus.toLowerCase() === 'healthy') {
+    tags.push({ label: 'Healthy', type: 'success' })
+  }
+
+  return tags
+}
+
+// 生成运营建议
+const generateOperationSuggestion = (row) => {
+  const tags = (row.inventoryTags || []).map(t => t.label)
+  const daysOfSupply = parseNumber(row.days_of_supply)
+  const available = parseNumber(row.available)
+  const unitsShippedT30 = parseNumber(row.units_shipped_t30)
+  const inbound = parseNumber(row.inbound_quantity)
+  const estimatedExcess = parseNumber(row.estimated_excess_quantity)
+  const unfulfillable = parseNumber(row.unfulfillable_quantity)
+  const totalReserved = parseNumber(row.total_reserved_quantity)
+
+  if (tags.includes('断货风险') || tags.includes('Out of stock')) {
+    if (inbound > 0) {
+      return `当前可售库存较低，近30天销量为${unitsShippedT30}，预计可售${daysOfSupply}天，但已有${inbound}件在途库存。建议跟进入仓进度，避免断货。`
+    } else {
+      return `当前存在断货风险，近30天销量为${unitsShippedT30}，可售库存仅${available}，预计可售${daysOfSupply}天。建议立即安排补货。`
+    }
+  }
+
+  if (tags.includes('压货风险') || tags.includes('Excess')) {
+    return `当前存在压货风险，预计过剩库存为${estimatedExcess}件。建议减少补货，结合优惠券、降价或广告清货。`
+  }
+
+  if (tags.includes('无销量库存')) {
+    return `当前SKU有库存但近30天无销量。建议检查Listing、价格、广告、评价和关键词流量，必要时做清货处理。`
+  }
+
+  if (tags.includes('库龄风险') || tags.includes('高库龄风险')) {
+    return `当前SKU存在181天以上老库存，可能产生更高仓储成本。建议优先促销、降价、Outlet或移除库存。`
+  }
+
+  if (tags.includes('不可售异常')) {
+    return `当前有${unfulfillable}件不可售库存。建议查看不可售原因，并决定重新上架、移除或弃置。`
+  }
+
+  if (tags.includes('保留库存偏高')) {
+    return `当前保留库存为${totalReserved}件，占比较高。建议观察是否为订单占用、仓间调拨或仓内处理中。`
+  }
+
+  if (tags.includes('库存偏紧')) {
+    return `当前库存偏紧，建议结合采购周期、头程周期和入仓时效安排补货。`
+  }
+
+  if (tags.includes('库存健康')) {
+    return `当前库存状态较健康，可售库存、销量和可售天数处于相对合理区间。建议保持观察。`
+  }
+
+  return `暂无明显异常。建议结合广告数据、利润数据和补货周期进一步判断。`
+}
+
+// 计算衍生字段
+const computeDerivedFields = (row) => {
+  const available = parseNumber(row.available)
+  const unitsShippedT7 = parseNumber(row.units_shipped_t7)
+  const unitsShippedT30 = parseNumber(row.units_shipped_t30)
+  const unitsShippedT90 = parseNumber(row.units_shipped_t90)
+  const inbound = parseNumber(row.inbound_quantity)
+  const invAge181270 = parseNumber(row.inv_age_181_to_270_days)
+  const invAge271365 = parseNumber(row.inv_age_271_to_365_days)
+  const invAge365Plus = parseNumber(row.inv_age_456_plus_days)
+
+  // 日均销量
+  row.daily_sales_t7 = unitsShippedT7 / 7
+  row.daily_sales_t30 = unitsShippedT30 / 30
+  row.daily_sales_t90 = unitsShippedT90 / 90
+
+  // 销量趋势系数
+  row.sales_trend_ratio = row.daily_sales_t30 > 0 ? row.daily_sales_t7 / row.daily_sales_t30 : 0
+
+  // 含在途总库存
+  row.total_available_with_inbound = available + inbound
+
+  // 含在途可售天数
+  row.estimated_cover_days_with_inbound = row.daily_sales_t30 > 0
+    ? row.total_available_with_inbound / row.daily_sales_t30
+    : 0
+
+  // 181天以上库存
+  row.aged_inventory_181_plus = invAge181270 + invAge271365 + invAge365Plus
+
+  // 271天以上库存
+  row.aged_inventory_271_plus = invAge271365 + invAge365Plus
+
+  // 库存状态标签
+  row.inventoryTags = getInventoryTags(row)
+
+  // 运营建议
+  row.operation_suggestion = generateOperationSuggestion(row)
+
+  return row
+}
+
 // 获取库存列表
 const fetchInventoryList = async () => {
   loading.value = true
@@ -624,34 +881,102 @@ const fetchInventoryList = async () => {
     const params = {
       page: pagination.value.currentPage,
       pageSize: pagination.value.pageSize,
-      sku: filterForm.value.sku,
-      productName: filterForm.value.productName,
-      stockStatus: filterForm.value.stockStatus,
-      minAge: filterForm.value.minAge,
-      maxAge: filterForm.value.maxAge,
       sortField: sortConfig.value.prop,
       sortOrder: sortConfig.value.order === 'descending' ? 'desc' : 'asc'
     }
-    
-    // 添加高级筛选参数
-    Object.assign(params, {
-      warehouseCode: advancedFilterForm.value.warehouseCode,
-      minSellable: advancedFilterForm.value.minSellable,
-      maxSellable: advancedFilterForm.value.maxSellable,
-      minReserved: advancedFilterForm.value.minReserved,
-      maxReserved: advancedFilterForm.value.maxReserved,
-      receivedStartDate: advancedFilterForm.value.receivedDateRange?.[0],
-      receivedEndDate: advancedFilterForm.value.receivedDateRange?.[1]
-    })
-    
+
+    if (filterForm.value.sku) {
+      params.search = filterForm.value.sku
+    }
+    if (filterForm.value.productName) {
+      params.productName = filterForm.value.productName
+    }
+
     const data = await apiService.fba.inventory.getList(params)
-    // 转换API数据字段：total_units = available_quantity + reserved_fc_transfer
-    inventoryList.value = (data.list || []).map(item => ({
-      ...item,
-      total_units: (item.available_quantity || 0) + (item.reserved_fc_transfer || 0),
-      product_name: item.item_name || item.product_name || ''
-    }))
-    pagination.value.total = data.pagination?.total || 0
+
+    // 转换并计算字段
+    inventoryList.value = (data.list || []).map(item => {
+      // 映射字段名
+      const mapped = {
+        sku: item.seller_sku || item.sku,
+        product_name: item.item_name || item.product_name,
+        fnsku: item.fnsku,
+        asin: item.asin,
+        available: parseNumber(item.available_quantity || item.available),
+        units_shipped_t7: parseNumber(item.units_shipped_t7 || item['units-shipped-t7']),
+        units_shipped_t30: parseNumber(item.units_shipped_t30 || item['units-shipped-t30']),
+        units_shipped_t60: parseNumber(item.units_shipped_t60 || item['units-shipped-t60']),
+        units_shipped_t90: parseNumber(item.units_shipped_t90 || item['units-shipped-t90']),
+        days_of_supply: parseNumber(item.days_of_supply || item['days-of-supply']),
+        sell_through: parseNumber(item.sell_through || item['sell-through']),
+        inbound_quantity: parseNumber(item.inbound_quantity || item['inbound-quantity']),
+        total_reserved_quantity: parseNumber(item.total_reserved_quantity || item['Total Reserved Quantity']),
+        unfulfillable_quantity: parseNumber(item.unfulfillable_quantity || item['unfulfillable-quantity']),
+        estimated_excess_quantity: parseNumber(item.estimated_excess_quantity || item['estimated-excess-quantity']),
+        estimated_storage_cost_next_month: parseNumber(item.estimated_storage_cost_next_month || item['estimated-storage-cost-next-month']),
+        fba_inventory_level_health_status: item.fba_inventory_level_health_status || item['fba-inventory-level-health-status'],
+        last_updated: item.last_updated || item.upload_time || item.snapshot_date,
+        snapshot_date: item.snapshot_date,
+        // 库龄字段
+        inv_age_181_to_270_days: parseNumber(item['inv-age-181-to-270-days'] || item.inv_age_181_to_270_days),
+        inv_age_271_to_365_days: parseNumber(item['inv-age-271-to-365-days'] || item.inv_age_271_to_365_days),
+        inv_age_456_plus_days: parseNumber(item['inv-age-456-plus-days'] || item.inv_age_456_plus_days),
+        // 原始数据保留
+        _raw: item
+      }
+
+      // 计算衍生字段
+      return computeDerivedFields(mapped)
+    })
+
+    // 前端筛选
+    if (filterForm.value.stockStatus && filterForm.value.stockStatus.length > 0) {
+      inventoryList.value = inventoryList.value.filter(item => {
+        const itemTags = item.inventoryTags.map(t => t.label)
+        return filterForm.value.stockStatus.some(status => itemTags.includes(status))
+      })
+    }
+
+    // 高级筛选
+    if (advancedFilterForm.value.asinFnsku) {
+      const keyword = advancedFilterForm.value.asinFnsku.toLowerCase()
+      inventoryList.value = inventoryList.value.filter(item =>
+        (item.asin && item.asin.toLowerCase().includes(keyword)) ||
+        (item.fnsku && item.fnsku.toLowerCase().includes(keyword))
+      )
+    }
+    if (advancedFilterForm.value.hasSales30Days) {
+      inventoryList.value = inventoryList.value.filter(item => item.units_shipped_t30 > 0)
+    }
+    if (advancedFilterForm.value.noSales30Days) {
+      inventoryList.value = inventoryList.value.filter(item => item.units_shipped_t30 === 0 && item.available > 0)
+    }
+    if (advancedFilterForm.value.needReplenish) {
+      inventoryList.value = inventoryList.value.filter(item => item.days_of_supply < 45 && item.units_shipped_t30 > 0)
+    }
+    if (advancedFilterForm.value.hasInbound) {
+      inventoryList.value = inventoryList.value.filter(item => item.inbound_quantity > 0)
+    }
+    if (advancedFilterForm.value.noInbound) {
+      inventoryList.value = inventoryList.value.filter(item => item.inbound_quantity === 0)
+    }
+    if (advancedFilterForm.value.hasExcess) {
+      inventoryList.value = inventoryList.value.filter(item => item.estimated_excess_quantity > 0)
+    }
+    if (advancedFilterForm.value.hasUnfulfillable) {
+      inventoryList.value = inventoryList.value.filter(item => item.unfulfillable_quantity > 0)
+    }
+    if (advancedFilterForm.value.hasReserved) {
+      inventoryList.value = inventoryList.value.filter(item => item.total_reserved_quantity > 0)
+    }
+    if (advancedFilterForm.value.hasAged181Plus) {
+      inventoryList.value = inventoryList.value.filter(item => item.aged_inventory_181_plus > 0)
+    }
+    if (advancedFilterForm.value.hasAged271Plus) {
+      inventoryList.value = inventoryList.value.filter(item => item.aged_inventory_271_plus > 0)
+    }
+
+    pagination.value.total = inventoryList.value.length
   } catch (error) {
     ElMessage.error(error.message || '获取库存列表失败')
     inventoryList.value = []
@@ -664,17 +989,19 @@ const fetchInventoryList = async () => {
 const fetchOverviewData = async () => {
   try {
     const data = await apiService.fba.inventory.getStats()
-    overviewData.value = data || {}
+    overviewData.value = {
+      totalAvailable: data.total_available || 0,
+      totalSales30Days: data.total_sales_30_days || 0,
+      outOfStockRisk: data.out_of_stock_risk || 0,
+      totalExcessQuantity: data.total_excess_quantity || 0,
+      totalInbound: data.total_inbound || 0,
+      totalUnfulfillable: data.total_unfulfillable || 0,
+      ageRiskCount: data.age_risk_count || 0,
+      totalStorageCost: data.total_storage_cost || 0
+    }
   } catch (error) {
     console.error('获取概览数据失败:', error)
-    overviewData.value = {
-      totalUnits: 1580,
-      totalValue: 425000,
-      lowStockCount: 12,
-      avgAgeDays: 45,
-      unitsChange: 0.12,
-      valueChange: 0.18
-    }
+    overviewData.value = {}
   }
 }
 
@@ -689,7 +1016,7 @@ const resetFilter = () => {
   filterForm.value = {
     sku: '',
     productName: '',
-    stockStatus: '',
+    stockStatus: [],
     minAge: null,
     maxAge: null
   }
@@ -710,12 +1037,17 @@ const applyAdvancedFilter = () => {
 
 const clearAdvancedFilter = () => {
   advancedFilterForm.value = {
-    warehouseCode: '',
-    minSellable: null,
-    maxSellable: null,
-    minReserved: null,
-    maxReserved: null,
-    receivedDateRange: []
+    asinFnsku: '',
+    hasSales30Days: false,
+    noSales30Days: false,
+    needReplenish: false,
+    hasInbound: false,
+    noInbound: false,
+    hasExcess: false,
+    hasUnfulfillable: false,
+    hasReserved: false,
+    hasAged181Plus: false,
+    hasAged271Plus: false
   }
   showAdvancedFilter.value = false
 }
@@ -723,7 +1055,6 @@ const clearAdvancedFilter = () => {
 // 分页处理
 const handleSizeChange = (size) => {
   pagination.value.pageSize = size
-  pagination.value.currentPage = 1
   fetchInventoryList()
 }
 
@@ -738,38 +1069,27 @@ const handleSortChange = ({ prop, order }) => {
   fetchInventoryList()
 }
 
-// 列设置处理
-const handleColumnCommand = (command) => {
-  // 处理列设置命令
-}
-
-const handleColumnVisibilityChange = (col) => {
-  // 保存列设置到本地存储
-  localStorage.setItem(`fba_inventory_columns_${col.prop}`, col.visible)
-}
-
 // 刷新数据
 const refreshData = () => {
   fetchInventoryList()
   fetchOverviewData()
 }
 
-// 导出数据
-const exportData = async () => {
+// 导出筛选后数据
+const exportFilteredData = async () => {
   try {
     loading.value = true
     const blob = await apiService.fba.inventory.exportData('excel')
-    
-    // 创建下载链接
+
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `FBA库存数据_${new Date().toISOString().split('T')[0]}.xlsx`
+    a.download = `FBA库存健康分析_${new Date().toISOString().split('T')[0]}.xlsx`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
     document.body.removeChild(a)
-    
+
     ElMessage.success('导出成功')
   } catch (error) {
     ElMessage.error(error.message || '导出失败')
@@ -780,7 +1100,12 @@ const exportData = async () => {
 
 // 查看预警
 const viewAlerts = () => {
-  alertsDialogVisible.value = true
+  // 设置筛选条件为异常状态
+  filterForm.value.stockStatus = [
+    '断货风险', '压货风险', '库龄风险', '高库龄风险',
+    '不可售异常', '无销量库存', '低于FBA最低'
+  ]
+  handleSearch()
 }
 
 // 上传成功后刷新数据
@@ -795,7 +1120,7 @@ const viewDetail = (row) => {
 }
 
 const createReplenishment = (row) => {
-  ElMessage.info('补货功能开发中')
+  ElMessage.info(`补货功能：SKU=${row.sku}, ASIN=${row.asin}, 可售=${row.available}, 30天销量=${row.units_shipped_t30}, 可售天数=${row.days_of_supply}`)
 }
 
 // 删除全部
@@ -825,118 +1150,40 @@ const deleteAll = async () => {
   }
 }
 
-const handleMoreCommand = (row, command) => {
-  switch (command) {
-    case 'transfer':
-      ElMessage.info('库存转移功能开发中')
-      break
-    case 'adjustment':
-      ElMessage.info('库存调整功能开发中')
-      break
-    case 'history':
-      ElMessage.info('历史记录功能开发中')
-      break
-    case 'export':
-      exportItem(row)
-      break
-  }
+// 样式辅助方法
+const getAvailableClass = (row) => {
+  if (row.available === 0) return 'danger-text'
+  if (row.available < 10) return 'warning-text'
+  return ''
 }
 
-const exportItem = (row) => {
-  const data = JSON.stringify(row, null, 2)
-  const blob = new Blob([data], { type: 'application/json' })
-  const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `FBA库存_${row.sku}_${new Date().toISOString().split('T')[0]}.json`
-  document.body.appendChild(a)
-  a.click()
-  window.URL.revokeObjectURL(url)
-  document.body.removeChild(a)
-  ElMessage.success('导出成功')
-}
-
-// 工具方法
-const formatCurrency = (value) => {
-  if (value === undefined || value === null) return '0.00'
-  return parseFloat(value).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
-
-const formatPercentage = (value) => {
-  if (value === undefined || value === null) return '0.00%'
-  return `${(value * 100).toFixed(2)}%`
-}
-
-const formatDateTime = (dateString) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-const getTrendClass = (change) => {
-  if (change > 0) return 'positive-trend'
-  if (change < 0) return 'negative-trend'
-  return 'neutral-trend'
-}
-
-const getAgeClass = (age) => {
-  if (age > 90) return 'age-high'
-  if (age > 60) return 'age-medium'
-  return 'age-low'
-}
-
-const getAgeStatus = (age) => {
-  if (age > 90) return '积压'
-  if (age > 60) return '偏高'
-  return '正常'
-}
-
-const getStockTagType = (row) => {
-  const available = row.available_quantity || 0
-  if (available === 0) return 'danger'
-  if (available < 10) return 'warning'
-  return 'success'
-}
-
-const getConditionType = (condition) => {
-  const typeMap = {
-    '全新': 'success',
-    '二手': 'warning',
-    '损坏': 'danger'
-  }
-  return typeMap[condition] || 'info'
+const getDaysOfSupplyClass = (row) => {
+  const days = row.days_of_supply || 0
+  if (days === 0) return 'danger-text'
+  if (days < 20) return 'danger-text'
+  if (days < 45) return 'warning-text'
+  if (days > 90) return 'warning-text'
+  return ''
 }
 
 const getHealthStatusType = (status) => {
   if (!status) return 'info'
-  const statusLower = status.toLowerCase()
-  if (statusLower.includes('healthy') || statusLower.includes('正常')) return 'success'
-  if (statusLower.includes('low stock') || statusLower.includes('低库存')) return 'warning'
-  if (statusLower.includes('excess') || statusLower.includes('积压')) return 'danger'
-  if (statusLower.includes('out of stock') || statusLower.includes('缺货')) return 'danger'
+  const s = status.toLowerCase()
+  if (s.includes('healthy')) return 'success'
+  if (s.includes('low stock')) return 'warning'
+  if (s.includes('excess') || s.includes('out of stock')) return 'danger'
   return 'info'
-}
-
-const getStockStatusType = (item) => {
-  if ((item.available_quantity || 0) === 0) return 'danger'
-  if ((item.available_quantity || 0) < 10) return 'warning'
-  return 'success'
-}
-
-const getStockStatusText = (item) => {
-  if ((item.available_quantity || 0) === 0) return '缺货'
-  if ((item.available_quantity || 0) < 10) return '低库存'
-  return '正常'
 }
 </script>
 
 <style scoped>
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 .page-header h2 {
   margin: 0;
   color: #303133;
@@ -961,7 +1208,7 @@ const getStockStatusText = (item) => {
   background: linear-gradient(135deg, #409EFF, #79BBFF);
 }
 
-.overview-card.total-value .overview-icon {
+.overview-card.total-sales .overview-icon {
   background: linear-gradient(135deg, #67C23A, #95D475);
 }
 
@@ -969,7 +1216,7 @@ const getStockStatusText = (item) => {
   background: linear-gradient(135deg, #E6A23C, #F3D19E);
 }
 
-.overview-card.avg-age .overview-icon {
+.overview-card.excess-stock .overview-icon {
   background: linear-gradient(135deg, #F56C6C, #F89898);
 }
 
@@ -1006,30 +1253,38 @@ const getStockStatusText = (item) => {
 .overview-label {
   font-size: 14px;
   color: #909399;
-  margin-bottom: 4px;
 }
 
-.overview-change {
+/* 小卡片样式 */
+.overview-card-small {
+  border-radius: 8px;
+  border: none;
+}
+
+.overview-item-small {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  padding: 12px 16px;
 }
 
-.overview-hint {
-  color: #C0C4CC;
-}
-
-.positive-trend {
-  color: #67C23A;
-}
-
-.negative-trend {
-  color: #F56C6C;
-}
-
-.neutral-trend {
+.overview-label-small {
+  font-size: 14px;
   color: #909399;
+}
+
+.overview-value-small {
+  font-size: 18px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.overview-value-small.warning {
+  color: #E6A23C;
+}
+
+.overview-value-small.danger {
+  color: #F56C6C;
 }
 
 .filter-card {
@@ -1074,6 +1329,32 @@ const getStockStatusText = (item) => {
   gap: 10px;
 }
 
+/* 库存标签 */
+.inventory-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.inventory-tag {
+  margin: 2px;
+}
+
+/* 文字颜色 */
+.danger-text {
+  color: #F56C6C;
+  font-weight: bold;
+}
+
+.warning-text {
+  color: #E6A23C;
+}
+
+.success-text {
+  color: #67C23A;
+}
+
+/* 卡片视图 */
 .card-view {
   margin-top: 20px;
 }
@@ -1091,12 +1372,14 @@ const getStockStatusText = (item) => {
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
 }
 
-.sku {
+.card-header .sku {
   font-weight: bold;
   color: #303133;
+  font-size: 14px;
 }
 
 .card-content {
@@ -1133,38 +1416,6 @@ const getStockStatusText = (item) => {
 .stat-value {
   color: #303133;
   font-weight: 500;
-}
-
-.additional-info {
-  border-top: 1px solid #EBEEF5;
-  padding-top: 12px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: #606266;
-}
-
-.info-item .el-icon {
-  margin-right: 6px;
-  font-size: 14px;
-}
-
-.age-high {
-  color: #F56C6C;
-  font-weight: bold;
-}
-
-.age-medium {
-  color: #E6A23C;
-  font-weight: bold;
-}
-
-.age-low {
-  color: #67C23A;
 }
 
 .card-actions {

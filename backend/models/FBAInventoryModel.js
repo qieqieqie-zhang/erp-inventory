@@ -332,17 +332,23 @@ class FBAInventoryModel extends BaseModel {
    */
   async getInventoryStats() {
     const [stats] = await this.query(`
-      SELECT 
+      SELECT
         COUNT(*) as total_sku,
         SUM(available_quantity) as total_available,
         SUM(unavailable_quantity) as total_unavailable,
         SUM(inbound_quantity) as total_inbound,
         SUM(sales_last_7_days) as total_7d_sales,
-        SUM(sales_last_30_days) as total_30d_sales,
+        SUM(sales_last_30_days) as total_sales_30_days,
+        SUM(sales_last_60_days) as total_sales_60_days,
+        SUM(sales_last_90_days) as total_sales_90_days,
         AVG(days_of_supply) as avg_days_supply,
-        SUM(CASE WHEN days_of_supply < 7 AND days_of_supply > 0 THEN 1 ELSE 0 END) as low_stock_sku,
-        SUM(CASE WHEN available_quantity = 0 THEN 1 ELSE 0 END) as zero_stock_sku,
-        SUM(CASE WHEN available_quantity > 100 THEN 1 ELSE 0 END) as high_stock_sku
+        SUM(CASE WHEN days_of_supply < 20 AND days_of_supply > 0 AND sales_last_30_days > 0 THEN 1 ELSE 0 END) as out_of_stock_risk,
+        SUM(CASE WHEN estimated_excess_quantity > 0 OR weeks_of_cover_t30 > 12 THEN 1 ELSE 0 END) as excess_risk,
+        SUM(CASE WHEN (inv_age_181_to_270_days + inv_age_271_to_365_days + inv_age_456_plus_days) > 0 THEN 1 ELSE 0 END) as age_risk_count,
+        SUM(estimated_excess_quantity) as total_excess_quantity,
+        SUM(estimated_storage_cost_next_month) as total_storage_cost,
+        SUM(CASE WHEN unfulfillable_quantity > 0 THEN 1 ELSE 0 END) as unfulfillable_count,
+        SUM(CASE WHEN days_of_supply < 45 AND days_of_supply > 0 AND sales_last_30_days > 0 THEN 1 ELSE 0 END) as low_stock_count
       FROM amazon_fba_inventory
     `);
 
