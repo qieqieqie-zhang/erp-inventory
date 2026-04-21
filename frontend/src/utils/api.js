@@ -3,10 +3,7 @@ import axios from 'axios'
 // 创建axios实例
 const api = axios.create({
   baseURL: 'http://localhost:3000/api',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  timeout: 10000
 })
 
 // 请求拦截器
@@ -16,6 +13,10 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    // 自动设置 Content-Type 为 application/json（除非是 FormData 上传）
+    if (!(config.data instanceof FormData)) {
+      config.headers['Content-Type'] = 'application/json'
     }
     return config
   },
