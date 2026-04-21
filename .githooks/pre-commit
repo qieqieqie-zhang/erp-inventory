@@ -1,0 +1,48 @@
+#!/bin/bash
+# pre-commit hook: 检查 JS/Vue 文件语法错误
+
+echo "Running pre-commit syntax check..."
+
+# 检查 backend JS 文件
+for file in $(git diff --cached --name-only | grep -E "\.js$" | grep "^backend/"); do
+  if [ -f "$file" ]; then
+    node --check "$file" 2>&1
+    if [ $? -ne 0 ]; then
+      echo "FAIL: Syntax error in $file"
+      exit 1
+    fi
+  fi
+done
+
+# 检查 frontend Vue 文件（使用 frontend/node_modules/@vue/compiler-sfc 验证）
+VUE_COMPILER="frontend/node_modules/@vue/compiler-sfc/dist/compiler-sfc.cjs.js"
+if [ -f "$VUE_COMPILER" ]; then
+  for file in $(git diff --cached --name-only | grep "\.vue$"); do
+    if [ -f "$file" ]; then
+      result=$(node -e "
+        const { compileScript, parse } = require('./$VUE_COMPILER');
+        const fs = require('fs');
+        const src = fs.readFileSync('$file', 'utf8');
+        try {
+          const { descriptor } = parse(src);
+          if (descriptor.script || descriptor.scriptSetup) {
+            compileScript(descriptor, { id: 'test' });
+          }
+          console.log('OK');
+        } catch(e) {
+          console.error('FAIL:', e.message);
+          process.exit(1);
+        }
+      " 2>&1)
+      if [ $? -ne 0 ]; then
+        echo "FAIL: Vue syntax error in $file: $result"
+        exit 1
+      fi
+      echo "OK: $file"
+    fi
+  done
+else
+  echo "Warning: @vue/compiler-sfc not found, skipping Vue validation"
+fi
+
+echo "All syntax checks passed."
