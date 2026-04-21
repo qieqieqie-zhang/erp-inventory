@@ -1,0 +1,413 @@
+<template>
+  <div class="layout-container">
+    <!-- 侧边栏 -->
+    <el-container>
+      <el-aside :width="isCollapse ? '64px' : '256px'" class="sidebar">
+        <div class="logo" @click="toggleCollapse">
+          <img v-if="!isCollapse" src="../assets/logo.png" alt="Logo" class="logo-img">
+          <span v-if="!isCollapse" class="logo-text">亚马逊ERP系统</span>
+          <el-icon v-else><Expand /></el-icon>
+        </div>
+        
+        <el-menu
+          :default-active="activeMenu"
+          :collapse="isCollapse"
+          :collapse-transition="false"
+          :unique-opened="true"
+          background-color="#304156"
+          text-color="#bfcbd9"
+          active-text-color="#409EFF"
+          router
+        >
+          <template v-for="route in menuRoutes" :key="route.path">
+            <!-- 有子菜单 -->
+            <el-sub-menu v-if="route.children && route.children.length > 0" :index="route.path">
+              <template #title>
+                <el-icon v-if="route.meta?.icon">
+                  <component :is="route.meta.icon" />
+                </el-icon>
+                <span>{{ route.meta?.title }}</span>
+              </template>
+              <el-menu-item
+                v-for="child in route.children"
+                :key="child.path"
+                :index="child.path"
+                v-show="!child.meta?.hidden"
+              >
+                {{ child.meta?.title }}
+              </el-menu-item>
+            </el-sub-menu>
+            
+            <!-- 无子菜单 -->
+            <el-menu-item v-else :index="route.path" v-show="!route.meta?.hidden">
+              <el-icon v-if="route.meta?.icon">
+                <component :is="route.meta.icon" />
+              </el-icon>
+              <template #title>
+                <span>{{ route.meta?.title }}</span>
+              </template>
+            </el-menu-item>
+          </template>
+        </el-menu>
+      </el-aside>
+      
+      <!-- 主内容区 -->
+      <el-container>
+        <!-- 顶部导航 -->
+        <el-header class="header">
+          <div class="header-left">
+            <el-icon class="collapse-icon" @click="toggleCollapse">
+              <component :is="isCollapse ? 'Expand' : 'Fold'" />
+            </el-icon>
+            <el-breadcrumb separator="/">
+              <el-breadcrumb-item v-for="item in breadcrumb" :key="item.path">
+                {{ item.meta?.title }}
+              </el-breadcrumb-item>
+            </el-breadcrumb>
+          </div>
+          
+          <div class="header-right">
+            <el-dropdown @command="handleCommand">
+              <div class="user-info">
+                <el-avatar :size="32" :src="userAvatar" class="avatar">
+                  {{ userInfo?.username?.charAt(0)?.toUpperCase() }}
+                </el-avatar>
+                <span class="username">{{ userInfo?.realName || userInfo?.username }}</span>
+                <el-icon><ArrowDown /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="profile">
+                    <el-icon><User /></el-icon> 个人中心
+                  </el-dropdown-item>
+                  <el-dropdown-item command="changePassword">
+                    <el-icon><Lock /></el-icon> 修改密码
+                  </el-dropdown-item>
+                  <el-dropdown-item divided command="logout">
+                    <el-icon><SwitchButton /></el-icon> 退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            
+            <el-tooltip content="全屏" placement="bottom">
+              <el-icon class="header-icon" @click="toggleFullscreen">
+                <FullScreen />
+              </el-icon>
+            </el-tooltip>
+            
+            <el-tooltip content="消息" placement="bottom">
+              <el-badge :value="unreadCount" :max="99" class="badge">
+                <el-icon class="header-icon">
+                  <Bell />
+                </el-icon>
+              </el-badge>
+            </el-tooltip>
+            
+            <el-tooltip content="设置" placement="bottom">
+              <el-icon class="header-icon" @click="openSettings">
+                <Setting />
+              </el-icon>
+            </el-tooltip>
+          </div>
+        </el-header>
+        
+        <!-- 内容区域 -->
+        <el-main class="main-content">
+          <router-view v-slot="{ Component }">
+            <transition name="fade-transform" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </el-main>
+        
+        <!-- 页脚 -->
+        <el-footer class="footer" height="40px">
+          <div class="footer-content">
+            <span>亚马逊跨境电商ERP系统 © 2026</span>
+            <span class="version">v1.0.0</span>
+          </div>
+        </el-footer>
+      </el-container>
+    </el-container>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '../stores/user'
+import { ElMessage, ElMessageBox } from 'element-plus'
+
+const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
+
+// 状态
+const isCollapse = ref(false)
+const unreadCount = ref(3) // 模拟未读消息数
+
+// 用户信息
+const userInfo = computed(() => userStore.userInfo)
+const userAvatar = computed(() => userStore.userInfo?.avatar || '')
+
+// 菜单路由（过滤隐藏的路由和需要权限的路由）
+const menuRoutes = computed(() => {
+  const routes = router.options.routes.find(r => r.path === '/')?.children || []
+  return routes.filter(route => {
+    // 检查角色权限
+    if (route.meta?.roles && !route.meta.roles.includes(userInfo.value?.role)) {
+      return false
+    }
+    return !route.meta?.hidden
+  })
+})
+
+// 当前激活菜单
+const activeMenu = computed(() => {
+  const { path } = route
+  return path
+})
+
+// 面包屑导航
+const breadcrumb = computed(() => {
+  const matched = route.matched.filter(item => item.meta?.title)
+  return matched
+})
+
+// 切换侧边栏折叠
+const toggleCollapse = () => {
+  isCollapse.value = !isCollapse.value
+}
+
+// 全屏切换
+const toggleFullscreen = () => {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen()
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen()
+    }
+  }
+}
+
+// 用户下拉菜单操作
+const handleCommand = async (command) => {
+  switch (command) {
+    case 'profile':
+      router.push('/profile')
+      break
+    case 'changePassword':
+      // 打开修改密码对话框
+      openChangePasswordDialog()
+      break
+    case 'logout':
+      await handleLogout()
+      break
+  }
+}
+
+// 修改密码对话框
+const openChangePasswordDialog = () => {
+  ElMessageBox.prompt('请输入新密码', '修改密码', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputType: 'password'
+  }).then(({ value }) => {
+    if (value && value.length >= 6) {
+      // 调用修改密码接口
+      ElMessage.success('密码修改成功')
+    } else {
+      ElMessage.error('密码长度不能少于6位')
+    }
+  }).catch(() => {
+    // 用户取消
+  })
+}
+
+// 退出登录
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await userStore.logout()
+    router.push('/login')
+    ElMessage.success('退出成功')
+  } catch (error) {
+    // 用户取消退出
+  }
+}
+
+// 打开设置
+const openSettings = () => {
+  ElMessage.info('设置功能开发中')
+}
+
+// 监听路由变化
+watch(() => route.path, () => {
+  // 可以在这里添加页面访问统计等
+})
+</script>
+
+<style scoped>
+.layout-container {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  background-color: #304156;
+  transition: width 0.3s;
+  overflow: hidden;
+}
+
+.logo {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background-color: #2b3748;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo-img {
+  height: 32px;
+  margin-right: 12px;
+}
+
+.logo-text {
+  color: #fff;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.el-menu {
+  border-right: none;
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+}
+
+.el-menu:not(.el-menu--collapse) {
+  width: 256px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #fff;
+  border-bottom: 1px solid #e6e6e6;
+  padding: 0 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.collapse-icon {
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+}
+
+.collapse-icon:hover {
+  color: #409EFF;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.user-info:hover {
+  background-color: #f5f5f5;
+}
+
+.avatar {
+  background-color: #409EFF;
+  color: #fff;
+}
+
+.username {
+  font-size: 14px;
+  color: #333;
+}
+
+.header-icon {
+  font-size: 20px;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.header-icon:hover {
+  color: #409EFF;
+}
+
+.badge {
+  cursor: pointer;
+}
+
+.main-content {
+  background-color: #f5f5f5;
+  padding: 20px;
+  overflow-y: auto;
+  height: calc(100vh - 100px);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  border-top: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+}
+
+.footer-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.version {
+  color: #409EFF;
+  font-weight: bold;
+}
+
+/* 过渡动画 */
+.fade-transform-enter-active,
+.fade-transform-leave-active {
+  transition: all 0.3s;
+}
+
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+</style>

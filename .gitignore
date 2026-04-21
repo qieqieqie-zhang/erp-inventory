@@ -1,0 +1,71 @@
+# 环境配置
+.env
+.env.local
+.env.*.local
+
+# 依赖
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# 上传文件
+backend/uploads/*.csv
+backend/uploads/*.xlsx
+backend/uploads/*.xls
+backend/uploads/*.txt
+!backend/uploads/.gitkeep
+
+# 错误文件
+uploads/errors/*
+!uploads/errors/.gitkeep
+
+# 日志
+*.log
+server.log
+frontend.log
+*.log.*
+server.out
+server.err
+server.pid
+frontend.out
+
+# 临时文件
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# 测试相关（已清理）
+*.test.js
+*_test.js
+test_*.js
+
+# 截图（测试结果）
+*.png
+
+# Claude 相关（本地工具）
+.claude/
+.claude.json
+.playwright-cli/
+.workbuddy/
+
+# Memory（个人记忆配置）
+memory/
+
+# 其他
+*.bak
+*.tmp
+
+# 本地脚本
+update_db.js
+backend/update_db.js
+backend/start_server.ps1
+backend/debug_product_list.js
+start_backend.ps1
+start_all.bat

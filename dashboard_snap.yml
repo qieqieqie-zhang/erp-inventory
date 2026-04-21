@@ -1,0 +1,278 @@
+- generic [ref=e26]:
+  - generic [ref=e27]:
+    - generic [ref=e29] [cursor=pointer]: 亚马逊ERP系统
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]: 调试测试
+        - button "测试商品列表" [ref=e33] [cursor=pointer]
+      - generic [ref=e35] [cursor=pointer]: 数据看板
+      - generic [ref=e37]:
+        - generic [ref=e38]: 商品管理
+        - generic [ref=e39]:
+          - generic [ref=e40] [cursor=pointer]: 商品列表
+          - generic [ref=e41] [cursor=pointer]: 商品上传
+      - generic [ref=e43]:
+        - generic [ref=e44]: 订单管理
+        - generic [ref=e45]:
+          - generic [ref=e46] [cursor=pointer]: 昨日订单
+          - generic [ref=e47] [cursor=pointer]: 近3天订单
+          - generic [ref=e48] [cursor=pointer]: 近7天订单
+          - generic [ref=e49] [cursor=pointer]: 近14天订单
+          - generic [ref=e50] [cursor=pointer]: 近30天订单
+          - generic [ref=e51] [cursor=pointer]: 订单销量汇总
+      - generic [ref=e53]:
+        - generic [ref=e54]: FBA管理
+        - generic [ref=e55]:
+          - generic [ref=e56] [cursor=pointer]: FBA库存
+          - generic [ref=e57] [cursor=pointer]: FBA预留库存
+      - generic [ref=e59] [cursor=pointer]: 业务报告
+      - generic [ref=e61] [cursor=pointer]: 数据汇总中心
+      - generic [ref=e63]:
+        - generic [ref=e64]: 系统管理
+        - generic [ref=e65]:
+          - generic [ref=e66] [cursor=pointer]: 用户管理
+          - generic [ref=e67] [cursor=pointer]: 上传日志
+  - generic [ref=e68]:
+    - generic [ref=e69]:
+      - generic [ref=e70]:
+        - generic [ref=e71] [cursor=pointer]: ◀
+        - generic [ref=e73]: 数据看板
+      - generic [ref=e75] [cursor=pointer]:
+        - generic [ref=e76]: A
+        - generic [ref=e77]: admin
+    - generic [ref=e79]:
+      - generic [ref=e80]:
+        - heading "数据看板" [level=1] [ref=e81]
+        - paragraph [ref=e82]: 实时监控库存与销售数据
+      - generic [ref=e83]:
+        - generic [ref=e86]:
+          - img [ref=e89]
+          - generic [ref=e91]:
+            - heading "总商品数" [level=3] [ref=e92]
+            - generic [ref=e93]: "1245"
+            - generic [ref=e95]: 在售 987
+        - generic [ref=e98]:
+          - img [ref=e101]
+          - generic [ref=e105]:
+            - heading "FBA可售库存" [level=3] [ref=e106]
+            - generic [ref=e107]: "8456"
+            - generic [ref=e109]: 在途 1234
+        - generic [ref=e112]:
+          - img [ref=e115]
+          - generic [ref=e117]:
+            - heading "近7天销量" [level=3] [ref=e118]
+            - generic [ref=e119]: "2456"
+            - generic [ref=e120]:
+              - img [ref=e122]
+              - generic [ref=e124]: 12.5%
+        - generic [ref=e127]:
+          - img [ref=e130]
+          - generic [ref=e134]:
+            - heading "近30天销售额" [level=3] [ref=e135]
+            - generic [ref=e136]: ¥123,456.78
+            - generic [ref=e137]:
+              - img [ref=e139]
+              - generic [ref=e141]: 8.3%
+      - generic [ref=e142]:
+        - generic [ref=e143]:
+          - generic [ref=e145]:
+            - heading "销量TOP10商品" [level=3] [ref=e146]
+            - generic [ref=e148] [cursor=pointer]:
+              - generic:
+                - combobox [ref=e150]
+                - generic [ref=e151]: 近7天
+              - img [ref=e154]
+          - generic [ref=e158]:
+            - generic [ref=e159]:
+              - generic [ref=e161]: "1"
+              - generic [ref=e162]:
+                - generic [ref=e163]: 无线蓝牙耳机
+                - generic [ref=e164]: SKU001
+              - generic [ref=e165]:
+                - generic [ref=e166]: "销量: 450"
+                - generic [ref=e167]: "销售额: ¥22,500.00"
+            - generic [ref=e168]:
+              - generic [ref=e170]: "2"
+              - generic [ref=e171]:
+                - generic [ref=e172]: 智能手表
+                - generic [ref=e173]: SKU002
+              - generic [ref=e174]:
+                - generic [ref=e175]: "销量: 380"
+                - generic [ref=e176]: "销售额: ¥30,400.00"
+            - generic [ref=e177]:
+              - generic [ref=e179]: "3"
+              - generic [ref=e180]:
+                - generic [ref=e181]: 手机支架
+                - generic [ref=e182]: SKU003
+              - generic [ref=e183]:
+                - generic [ref=e184]: "销量: 320"
+                - generic [ref=e185]: "销售额: ¥6,400.00"
+            - generic [ref=e186]:
+              - generic [ref=e188]: "4"
+              - generic [ref=e189]:
+                - generic [ref=e190]: 充电宝
+                - generic [ref=e191]: SKU004
+              - generic [ref=e192]:
+                - generic [ref=e193]: "销量: 280"
+                - generic [ref=e194]: "销售额: ¥11,200.00"
+            - generic [ref=e195]:
+              - generic [ref=e197]: "5"
+              - generic [ref=e198]:
+                - generic [ref=e199]: 数据线
+                - generic [ref=e200]: SKU005
+              - generic [ref=e201]:
+                - generic [ref=e202]: "销量: 250"
+                - generic [ref=e203]: "销售额: ¥2,500.00"
+            - generic [ref=e204]:
+              - generic [ref=e206]: "6"
+              - generic [ref=e207]:
+                - generic [ref=e208]: 手机壳
+                - generic [ref=e209]: SKU006
+              - generic [ref=e210]:
+                - generic [ref=e211]: "销量: 220"
+                - generic [ref=e212]: "销售额: ¥4,400.00"
+            - generic [ref=e213]:
+              - generic [ref=e215]: "7"
+              - generic [ref=e216]:
+                - generic [ref=e217]: 屏幕保护膜
+                - generic [ref=e218]: SKU007
+              - generic [ref=e219]:
+                - generic [ref=e220]: "销量: 200"
+                - generic [ref=e221]: "销售额: ¥2,000.00"
+            - generic [ref=e222]:
+              - generic [ref=e224]: "8"
+              - generic [ref=e225]:
+                - generic [ref=e226]: 键盘
+                - generic [ref=e227]: SKU008
+              - generic [ref=e228]:
+                - generic [ref=e229]: "销量: 180"
+                - generic [ref=e230]: "销售额: ¥14,400.00"
+            - generic [ref=e231]:
+              - generic [ref=e233]: "9"
+              - generic [ref=e234]:
+                - generic [ref=e235]: 鼠标
+                - generic [ref=e236]: SKU009
+              - generic [ref=e237]:
+                - generic [ref=e238]: "销量: 150"
+                - generic [ref=e239]: "销售额: ¥7,500.00"
+            - generic [ref=e240]:
+              - generic [ref=e242]: "10"
+              - generic [ref=e243]:
+                - generic [ref=e244]: USB扩展坞
+                - generic [ref=e245]: SKU010
+              - generic [ref=e246]:
+                - generic [ref=e247]: "销量: 120"
+                - generic [ref=e248]: "销售额: ¥8,400.00"
+        - generic [ref=e249]:
+          - generic [ref=e251]:
+            - heading "库存预警" [level=3] [ref=e252]
+            - generic [ref=e254]: 4 个预警
+          - generic [ref=e257]:
+            - generic [ref=e258]:
+              - generic [ref=e261]: 即将断货
+              - generic [ref=e262]:
+                - generic [ref=e263]: SKU011
+                - generic [ref=e264]: 库存可供天数仅剩3天
+              - button "查看详情" [ref=e266] [cursor=pointer]:
+                - generic [ref=e267]: 查看详情
+            - generic [ref=e268]:
+              - generic [ref=e271]: 零库存
+              - generic [ref=e272]:
+                - generic [ref=e273]: SKU012
+                - generic [ref=e274]: 库存已售罄
+              - button "查看详情" [ref=e276] [cursor=pointer]:
+                - generic [ref=e277]: 查看详情
+            - generic [ref=e278]:
+              - generic [ref=e281]: 积压库存
+              - generic [ref=e282]:
+                - generic [ref=e283]: SKU013
+                - generic [ref=e284]: 库存积压超过100件，30天销量仅5件
+              - button "查看详情" [ref=e286] [cursor=pointer]:
+                - generic [ref=e287]: 查看详情
+            - generic [ref=e288]:
+              - generic [ref=e291]: 即将断货
+              - generic [ref=e292]:
+                - generic [ref=e293]: SKU014
+                - generic [ref=e294]: 库存可供天数仅剩5天
+              - button "查看详情" [ref=e296] [cursor=pointer]:
+                - generic [ref=e297]: 查看详情
+      - generic [ref=e298]:
+        - heading "快速操作" [level=3] [ref=e300]
+        - generic [ref=e302]:
+          - button "上传商品数据" [ref=e303] [cursor=pointer]:
+            - img [ref=e305]
+            - generic [ref=e307]: 上传商品数据
+          - button "查看昨日订单" [ref=e308] [cursor=pointer]:
+            - img [ref=e310]
+            - generic [ref=e312]: 查看昨日订单
+          - button "查看库存预警" [ref=e313] [cursor=pointer]:
+            - img [ref=e315]
+            - generic [ref=e317]: 查看库存预警
+          - button "导出报表" [ref=e318] [cursor=pointer]:
+            - img [ref=e320]
+            - generic [ref=e322]: 导出报表
+      - generic [ref=e323]:
+        - heading "最近上传记录" [level=3] [ref=e325]
+        - generic [ref=e328]:
+          - table [ref=e330]:
+            - rowgroup [ref=e338]:
+              - row "文件名 模块 成功记录 失败记录 上传时间 操作" [ref=e339]:
+                - columnheader "文件名" [ref=e340]:
+                  - generic [ref=e341]: 文件名
+                - columnheader "模块" [ref=e342]:
+                  - generic [ref=e343]: 模块
+                - columnheader "成功记录" [ref=e344]:
+                  - generic [ref=e345]: 成功记录
+                - columnheader "失败记录" [ref=e346]:
+                  - generic [ref=e347]: 失败记录
+                - columnheader "上传时间" [ref=e348]:
+                  - generic [ref=e349]: 上传时间
+                - columnheader "操作" [ref=e350]:
+                  - generic [ref=e351]: 操作
+          - table [ref=e356]:
+            - rowgroup [ref=e364]:
+              - row "所有商品报告_2026-04-08.txt 商品库存 1245 12 2026/04/08 14:30 查看详情" [ref=e365]:
+                - cell "所有商品报告_2026-04-08.txt" [ref=e366]:
+                  - generic [ref=e367]: 所有商品报告_2026-04-08.txt
+                - cell "商品库存" [ref=e368]:
+                  - generic [ref=e371]: 商品库存
+                - cell "1245" [ref=e372]:
+                  - generic [ref=e373]: "1245"
+                - cell "12" [ref=e374]:
+                  - generic [ref=e375]: "12"
+                - cell "2026/04/08 14:30" [ref=e376]:
+                  - generic [ref=e377]: 2026/04/08 14:30
+                - cell "查看详情" [ref=e378]:
+                  - button "查看详情" [ref=e380] [cursor=pointer]:
+                    - generic [ref=e381]: 查看详情
+              - row "FBA库存报告_2026-04-08.txt FBA库存 987 5 2026/04/08 10:15 查看详情" [ref=e382]:
+                - cell "FBA库存报告_2026-04-08.txt" [ref=e383]:
+                  - generic [ref=e384]: FBA库存报告_2026-04-08.txt
+                - cell "FBA库存" [ref=e385]:
+                  - generic [ref=e388]: FBA库存
+                - cell "987" [ref=e389]:
+                  - generic [ref=e390]: "987"
+                - cell "5" [ref=e391]:
+                  - generic [ref=e392]: "5"
+                - cell "2026/04/08 10:15" [ref=e393]:
+                  - generic [ref=e394]: 2026/04/08 10:15
+                - cell "查看详情" [ref=e395]:
+                  - button "查看详情" [ref=e397] [cursor=pointer]:
+                    - generic [ref=e398]: 查看详情
+              - row "昨日订单_2026-04-07.txt 订单 245 3 2026/04/07 09:20 查看详情" [ref=e399]:
+                - cell "昨日订单_2026-04-07.txt" [ref=e400]:
+                  - generic [ref=e401]: 昨日订单_2026-04-07.txt
+                - cell "订单" [ref=e402]:
+                  - generic [ref=e405]: 订单
+                - cell "245" [ref=e406]:
+                  - generic [ref=e407]: "245"
+                - cell "3" [ref=e408]:
+                  - generic [ref=e409]: "3"
+                - cell "2026/04/07 09:20" [ref=e410]:
+                  - generic [ref=e411]: 2026/04/07 09:20
+                - cell "查看详情" [ref=e412]:
+                  - button "查看详情" [ref=e414] [cursor=pointer]:
+                    - generic [ref=e415]: 查看详情
+    - generic [ref=e417]:
+      - generic [ref=e418]: 亚马逊跨境电商ERP系统 © 2026
+      - generic [ref=e419]: v1.0.0
