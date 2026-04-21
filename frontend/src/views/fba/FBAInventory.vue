@@ -641,6 +641,11 @@ const visibleColumns = computed(() => {
 const uploadDialogVisible = ref(false)
 const alertsDialogVisible = ref(false)
 
+// 打开上传对话框
+const showUploadDialog = () => {
+  uploadDialogVisible.value = true
+}
+
 // 初始化加载数据
 onMounted(() => {
   fetchInventoryList()
