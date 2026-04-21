@@ -39,6 +39,7 @@ describe('物流同步商品功能测试', () => {
         id: 144,
         fba_warehouse_number: 'MIT-001',
         shop_id: 16,
+        destination_country: 'US',
         sku_list: JSON.stringify([
           { sku_code: 'SKU001', sku_name: '商品1', quantity: 100 },
           { sku_code: 'SKU002', sku_name: '商品2', quantity: 50 }
@@ -58,7 +59,8 @@ describe('物流同步商品功能测试', () => {
         expect.any(Array),
         144,
         'MIT-001',
-        16
+        16,
+        'US'
       );
     });
 
@@ -67,6 +69,7 @@ describe('物流同步商品功能测试', () => {
         id: 145,
         fba_warehouse_number: 'MIT-002',
         shop_id: 16,
+        destination_country: 'DE',
         sku_list: JSON.stringify([
           { sku_code: 'NEW-SKU', sku_name: '新商品', quantity: 30 }
         ])
@@ -190,6 +193,7 @@ describe('物流同步商品功能测试', () => {
         id: 151,
         fba_warehouse_number: 'WAREHOUSE-X',
         shop_id: 20,
+        destination_country: 'JP',
         sku_list: JSON.stringify([
           { sku_code: 'TEST-SKU', sku_name: '测试商品' }
         ])
@@ -207,7 +211,35 @@ describe('物流同步商品功能测试', () => {
         expect.arrayContaining([expect.objectContaining({ sku_code: 'TEST-SKU' })]),
         151,                    // 物流记录ID
         'WAREHOUSE-X',         // FBA仓库编号
-        20                     // 店铺ID
+        20,                    // 店铺ID
+        'JP'                   // 目的地国家
+      );
+    });
+
+    test('同步时美国地址映射为AMAZON_NA', async () => {
+      const logisticsRecord = {
+        id: 152,
+        fba_warehouse_number: 'MIT-007',
+        shop_id: 16,
+        destination_country: 'US',
+        sku_list: JSON.stringify([
+          { sku_code: 'US-SKU', sku_name: '美国商品' }
+        ])
+      };
+
+      LogisticsModel.findById.mockResolvedValue(logisticsRecord);
+      ProductModel.syncFromLogistics.mockResolvedValue({ updated: 1, inserted: 0 });
+
+      const res = await request(app)
+        .post('/api/logistics/sync-products/152')
+        .expect(200);
+
+      expect(ProductModel.syncFromLogistics).toHaveBeenCalledWith(
+        expect.any(Array),
+        152,
+        'MIT-007',
+        16,
+        'US'
       );
     });
   });

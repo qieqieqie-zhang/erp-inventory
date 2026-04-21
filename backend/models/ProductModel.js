@@ -344,17 +344,61 @@ class ProductModel extends BaseModel {
   }
 
   /**
+   * 根据目的地国家映射配送渠道
+   * @param {string} destinationCountry - 目的地国家
+   * @returns {string} fulfillment_channel值
+   */
+  mapDestinationToChannel(destinationCountry) {
+    if (!destinationCountry) return '';
+
+    const country = destinationCountry.toUpperCase();
+
+    // 美国 -> 亚马逊北美
+    if (country === 'US' || country === 'USA' || country === 'UNITED STATES') {
+      return 'AMAZON_NA';
+    }
+
+    // 日本 -> 亚马逊日本
+    if (country === 'JP' || country === 'JAPAN') {
+      return 'AMAZON_JP';
+    }
+
+    // 欧洲主要国家 -> 亚马逊欧洲
+    const euCountries = ['UK', 'GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'PL', 'SE', 'CZ', 'AT', 'BE', 'IE', 'PT', 'SK', 'HU'];
+    if (euCountries.includes(country)) {
+      return 'AMAZON_EU';
+    }
+
+    // 加拿大、墨西哥 -> 亚马逊北美（可单独处理）
+    if (country === 'CA' || country === 'MX') {
+      return 'AMAZON_NA';
+    }
+
+    // 澳大利亚 -> 单独站点（如果有的话可以添加）
+    if (country === 'AU') {
+      return 'AMAZON_NA'; // 暂时归到北美
+    }
+
+    return '';
+  }
+
+  /**
    * 从物流记录同步/覆盖商品数据（按 SKU + 批次匹配）
    * 匹配到则覆盖数量、店铺等信息，未匹配到则新建
    * @param {Array} items - SKU数据列表 [{sku_code, sku_name, quantity}]
    * @param {number} logisticsId - 物流记录ID
    * @param {string} fbaWarehouseNumber - FBA仓库编号（用于批次标识）
    * @param {number} shopId - 店铺ID
+   * @param {string} destinationCountry - 目的地国家（用于映射fulfillment_channel）
    * @returns {Promise<Object>} { updated, inserted }
    */
-  async syncFromLogistics(items, logisticsId, fbaWarehouseNumber, shopId) {
+  async syncFromLogistics(items, logisticsId, fbaWarehouseNumber, shopId, destinationCountry) {
     // 批次前缀用 logistics_ID 格式，与创建时保持一致
     const batchPrefix = `logistics_${logisticsId}`;
+
+    // 根据目的地国家映射配送渠道
+    const fulfillmentChannel = this.mapDestinationToChannel(destinationCountry);
+
     let updated = 0;
     let inserted = 0;
 
@@ -375,25 +419,27 @@ class ProductModel extends BaseModel {
       }
 
       if (existing) {
-        // 覆盖更新：店铺和批次取物流数据，数量固定为0（在途≠可售），只更新item_name、shop_id、upload_batch、quantity，其他字段保持不变
+        // 覆盖更新：店铺和批次取物流数据，数量固定为0（在途≠可售），更新配送渠道
         await this.query(
           `UPDATE amazon_products SET
             item_name = COALESCE(?, item_name),
             shop_id = ?,
             upload_batch = ?,
-            quantity = 0
+            quantity = 0,
+            fulfillment_channel = ?
           WHERE id = ?`,
-          [item.sku_name || existing.item_name, shopId, batchPrefix, existing.id]
+          [item.sku_name || existing.item_name, shopId, batchPrefix, fulfillmentChannel, existing.id]
         );
         updated++;
       } else {
-        // 新建商品：数量固定为0（物流在途，不算可售库存）
+        // 新建商品：数量固定为0（物流在途，不算可售）
         await this.create({
           seller_sku: sku,
           item_name: item.sku_name || sku,
           quantity: 0,
           shop_id: shopId,
-          upload_batch: batchPrefix
+          upload_batch: batchPrefix,
+          fulfillment_channel: fulfillmentChannel
         });
         inserted++;
       }

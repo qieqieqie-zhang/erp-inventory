@@ -858,7 +858,8 @@ class LogisticsController {
         skuItems,
         parseInt(id),
         fba_warehouse_number,
-        shop_id
+        shop_id,
+        logisticsRecord.destination_country
       );
 
       // 写日志
