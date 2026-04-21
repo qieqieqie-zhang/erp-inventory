@@ -62,6 +62,9 @@ memory/
 *.bak
 *.tmp
 
+# 测试数据文件目录
+test-data/
+
 # 本地脚本
 update_db.js
 backend/update_db.js
