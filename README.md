@@ -427,3 +427,354 @@ JWT 令牌认证，包含：
 | `system_upload_logs` | 上传日志表 |
 | `system_operation_logs` | 操作日志表 |
 | `sku_inventory_logs` | SKU库存变动日志表 |
+
+---
+
+## 十、数据库表结构
+
+### 10.1 shops（店铺管理表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| shop_id | VARCHAR(50) | 店铺标识ID（唯一） |
+| shop_name | VARCHAR(100) | 店铺名称 |
+| shop_code | VARCHAR(50) | 店铺代码（唯一） |
+| shop_type | ENUM | 平台类型：Amazon / eBay / Walmart / Other |
+| region | VARCHAR(100) | 区域/国家 |
+| marketplace | VARCHAR(100) | 市场/站点 |
+| seller_id | VARCHAR(100) | 卖家ID |
+| status | ENUM | 状态：active / inactive |
+| created_at | TIMESTAMP | 创建时间 |
+| updated_at | TIMESTAMP | 更新时间 |
+
+**关联**：被 `amazon_products`、`amazon_orders`、`logistics_tracking` 的 `shop_id` 字段引用。
+
+---
+
+### 10.2 system_users（系统用户表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| username | VARCHAR(50) | 用户名（唯一） |
+| password | VARCHAR(255) | 密码（bcrypt加密） |
+| role | ENUM | 角色：admin / boss / purchase / warehouse / finance / sales |
+| real_name | VARCHAR(100) | 真实姓名 |
+| email | VARCHAR(100) | 邮箱 |
+| phone | VARCHAR(20) | 电话 |
+| status | TINYINT | 状态：1正常 / 0禁用 |
+| last_login | DATETIME | 最后登录时间 |
+| created_at | TIMESTAMP | 创建时间 |
+| updated_at | TIMESTAMP | 更新时间 |
+
+**关联**：被 `system_upload_logs` 的 `user_id` 引用。
+
+---
+
+### 10.3 amazon_products（商品库存表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| seller_sku | VARCHAR(100) | SKU编号（唯一） |
+| item_name | TEXT | 商品名称 |
+| price | DECIMAL(10,2) | 售价 |
+| quantity | INT | **可售库存**（商品管理页面直接填写的库存） |
+| pending_quantity | INT | 待处理库存 |
+| image_url | TEXT | 商品图片URL |
+| asin1 | VARCHAR(20) | ASIN |
+| fulfillment_channel | VARCHAR(50) | 配送渠道：FBA / 自发货 |
+| status | VARCHAR(50) | 状态：Active / Inactive |
+| open_date | DATETIME | 上架时间 |
+| listing_id | VARCHAR(100) | listing ID |
+| shop_id | INT | **关联店铺ID**（物流同步时写入） |
+| upload_batch | VARCHAR(50) | **上传批次**（格式：`logistics_{FBA仓库编号}` 或 `PRD_{时间戳}`） |
+| upload_time | TIMESTAMP | 上传时间 |
+
+**关联**：通过 `shop_id` 关联 `shops`；通过 `upload_batch` 前缀可区分数据来源。
+
+**注意**：`quantity` 是"可售库存"，来自商品管理页面；物流/FBA的库存数量通过 JOIN 查询显示，不写入此字段。
+
+---
+
+### 10.4 amazon_orders（订单表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| order_item_id | VARCHAR(100) | 订单项ID（唯一约束） |
+| dimension | ENUM | **时间维度**：1day / 3days / 7days / 14days / 30days |
+| seller_sku | VARCHAR(100) | SKU |
+| order_id | VARCHAR(100) | 订单号 |
+| total_amount | DECIMAL(10,2) | 总金额 |
+| quantity_purchased | INT | 购买数量 |
+| purchase_date | DATETIME | 购买日期 |
+| ship_country | VARCHAR(100) | 收货国家 |
+| fulfillment_channel | VARCHAR(50) | 配送渠道 |
+| shop_id | INT | **关联店铺ID** |
+| upload_batch | VARCHAR(50) | 上传批次 |
+| upload_time | TIMESTAMP | 上传时间 |
+
+**联合唯一索引**：`uk_order_dimension (order_item_id, dimension)` — 同一订单在不同时间维度独立存储。
+
+---
+
+### 10.5 amazon_fba_inventory（FBA库存表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| seller_sku | VARCHAR(100) | SKU（唯一） |
+| item_name | TEXT | 商品名称 |
+| asin | VARCHAR(20) | ASIN |
+| fnsku | VARCHAR(100) | FNSKU |
+| available_quantity | INT | **可售库存数量** |
+| unavailable_quantity | INT | 不可售库存数量 |
+| inbound_quantity | INT | 入库总数 |
+| inbound_working | INT | 入库处理中 |
+| shipped_quantity | INT | 已发货在途 |
+| received_quantity | INT | 已接收数量 |
+| total_reserved_quantity | INT | 总预留数量 |
+| unfulfillable_quantity | INT | 无法配送数量 |
+| sales_last_7_days | INT | 近7天销量 |
+| sales_last_30_days | INT | 近30天销量 |
+| days_of_supply | INT | 库存可供天数 |
+| days_of_supply | INT | 库存可供天数 |
+| marketplace | VARCHAR(50) | 站点 |
+| snapshot_date | DATE | 库存快照日期 |
+| recommended_ship_in_quantity | INT | 建议补货量 |
+| recommended_ship_in_date | DATE | 建议发货日期 |
+| shop_id | INT | **关联店铺ID** |
+| upload_batch | VARCHAR(50) | 上传批次 |
+| upload_time | TIMESTAMP | 上传时间 |
+
+**关联**：通过 `seller_sku` 与 `amazon_products` 关联查询。
+
+---
+
+### 10.6 amazon_fba_reserved（FBA预留库存表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| seller_sku | VARCHAR(100) | SKU（唯一） |
+| total_reserved | INT | **总预留数量** |
+| customer_order_reserved | INT | 买家订单预留 |
+| transfer_reserved | INT | 调仓预留 |
+| warehouse_processing_reserved | INT | 仓库处理预留 |
+| item_name | TEXT | 商品名称 |
+| asin | VARCHAR(20) | ASIN |
+| fnsku | VARCHAR(100) | FNSKU |
+| project_type | VARCHAR(100) | 项目类型 |
+| upload_batch | VARCHAR(50) | 上传批次 |
+| upload_time | TIMESTAMP | 上传时间 |
+
+---
+
+### 10.7 logistics_tracking（物流跟踪表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| shop_id | INT | **关联店铺ID** |
+| fba_warehouse_number | VARCHAR(100) | **FBA入仓号**（关联商品的关键标识） |
+| tracking_number | VARCHAR(200) | 物流单号 |
+| destination_country | VARCHAR(100) | 目的国家 |
+| ship_date | DATE | 发货日期 |
+| eta | DATETIME | 预计到达时间 |
+| etd | DATETIME | 发船时间 |
+| forwarder_name | VARCHAR(200) | 货代名称 |
+| carton_count | INT | 箱数 |
+| shipping_method | VARCHAR(50) | 运输方式：海运/空运/快递 |
+| price | DECIMAL(12,2) | 总价 |
+| price_per_carton | DECIMAL(10,2) | 箱均价格 |
+| vat_amount | DECIMAL(12,2) | VAT税费 |
+| tax_rebate | DECIMAL(12,2) | 退税金额 |
+| freight_cost | DECIMAL(12,2) | 运费 |
+| sku_list | TEXT | **SKU列表（JSON格式）**，包含每个SKU的 code/name/quantity/unit_price |
+| logistics_status | ENUM | **物流状态**：pending / shipped / in_transit / arrived / customs_cleared / delivered |
+| upload_batch | VARCHAR(50) | 上传批次 |
+| upload_time | TIMESTAMP | 上传时间 |
+
+**sku_list JSON 结构示例**：
+```json
+[
+  { "sku_code": "SKU001", "sku_name": "商品名称", "quantity": 100, "unit_price": 12.5 },
+  { "sku_code": "SKU002", "sku_name": "商品名称2", "quantity": 200, "unit_price": 8.0 }
+]
+```
+
+**关联**：通过 `fba_warehouse_number` 批次前缀 `logistics_{FBA仓库编号}` 关联 `amazon_products.upload_batch`。
+
+---
+
+### 10.8 amazon_business_report（业务报告表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| seller_sku | VARCHAR(100) | SKU |
+| report_month | DATE | 报告月份（格式 YYYY-MM-01） |
+| item_title | TEXT | 商品标题 |
+| parent_asin | VARCHAR(20) | 父ASIN |
+| child_asin | VARCHAR(20) | 子ASIN |
+| sessions | INT | 会话数 |
+| page_views | INT | 页面浏览量 |
+| conversion_rate | DECIMAL(5,2) | 转化率 |
+| ordered_quantity | INT | 已订购数量 |
+| sales_amount | DECIMAL(10,2) | 销售额 |
+| sales_amount_b2b | DECIMAL(10,2) | B2B销售额 |
+| upload_batch | VARCHAR(50) | 上传批次 |
+| upload_time | TIMESTAMP | 上传时间 |
+
+**联合唯一索引**：`uk_sku_month (seller_sku, report_month)`
+
+---
+
+### 10.9 system_upload_logs（上传日志表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| user_id | INT | **操作人ID** |
+| username | VARCHAR(50) | 操作人名称 |
+| module | VARCHAR(50) | 模块：product / order / fba_inventory / fba_reserved / business / logistics |
+| dimension | VARCHAR(20) | 时间维度（仅订单模块） |
+| filename | VARCHAR(255) | 上传文件名 |
+| total_records | INT | 总记录数 |
+| success_count | INT | 成功条数 |
+| update_count | INT | 更新条数 |
+| fail_count | INT | 失败条数 |
+| error_file | TEXT | 错误记录文件路径 |
+| upload_time | TIMESTAMP | 上传时间 |
+
+---
+
+### 10.10 sku_inventory_logs（库存变动日志表）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INT | 主键 |
+| sku_code | VARCHAR(100) | SKU编号 |
+| module | VARCHAR(50) | **来源模块**：logistics / fba_inventory / fba_reserved |
+| action | VARCHAR(50) | **操作类型**：upload / delete / update / status_change |
+| before_quantity | INT | 变动前数量 |
+| after_quantity | INT | 变动后数量 |
+| change_amount | INT | **变动数量**（正数=增加，负数=减少） |
+| remarks | TEXT | 备注说明 |
+| operator_id | INT | 操作人ID |
+| operator_name | VARCHAR(100) | 操作人名称 |
+| reference_id | VARCHAR(100) | 关联业务ID（物流ID / 批次号） |
+| created_at | TIMESTAMP | 变动时间 |
+
+---
+
+## 十一、模块数据流关系
+
+### 11.1 数据流总览
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              数据来源                                      │
+│                                                                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐ │
+│  │ 商品管理  │  │ 物流跟踪  │  │FBA库存   │  │FBA预留   │  │ 业务报告 │ │
+│  │  上传    │  │  上传    │  │  上传    │  │  上传    │  │  上传    │ │
+│  └───┬──────┘  └───┬──────┘  └───┬──────┘  └───┬──────┘  └───┬──────┘ │
+│      │             │             │             │             │          │
+│      ▼             ▼             ▼             ▼             ▼          │
+│  amazon_products  logistics_   amazon_fba_   amazon_fba_  amazon_     │
+│  (quantity)     tracking       inventory      reserved     business_    │
+│                  (sku_list)   (available_   (total_       report      │
+│                                 quantity)    reserved)                  │
+│                     │                                                  │
+│                     │  JOIN（查询时关联，不重复存储）                   │
+│                     ▼                                                  │
+│              amazon_products                                       │
+│           (库存分布列: 物流+FBA库存+FBA预留)                          │
+│                     │                                                  │
+│                     ▼                                                  │
+│         ┌───────────────────────┐                                    │
+│         │  商品管理页面展示      │                                    │
+│         │  可售库存 │ 库存分布  │                                    │
+│         └───────────────────────┘                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.2 商品管理 → 店铺（单向）
+
+```
+商品管理上传 → amazon_products.shop_id = shops.id
+```
+
+商品表 `shop_id` 关联店铺，**店铺表是主数据**，商品引用店铺ID。
+
+### 11.3 物流跟踪 → 商品主表（同步）
+
+```
+物流上传SKU
+    │
+    ├── 1. logistics_tracking.sku_list（JSON）存储SKU明细
+    │
+    └── 2. 点击"同步商品" → amazon_products
+              │
+              ├── 有同 SKU + 同批次（logistics_{FBA仓库编号）→ 覆盖更新
+              ├── 有同 SKU 但不同批次（logistics_*）→ 覆盖更新
+              └── 无该 SKU → 新建
+              │
+              └── amazon_products.upload_batch = `logistics_{FBA仓库编号}`
+```
+
+**关键字段**：`fba_warehouse_number` 作为批次标识，同一FBA仓库编号的物流数据覆盖更新同一批次商品。
+
+### 11.4 商品管理页面库存展示（JOIN查询）
+
+```
+amazon_products（商品主档）
+    │
+    ├── LEFT JOIN amazon_fba_inventory（通过 seller_sku）
+    │       → fba_inventory_quantity = available_quantity
+    │
+    ├── LEFT JOIN amazon_fba_reserved（通过 seller_sku）
+    │       → fba_reserved_quantity = total_reserved
+    │
+    └── LEFT JOIN logistics_tracking.sku_list（通过 seller_sku，用 JSON_TABLE 解析）
+            → logistics_quantity = SUM(sku_list 中该 SKU 的 quantity)
+            → logistics_status = 最新一条物流记录的 status
+
+商品管理页面展示：
+    可售库存 = amazon_products.quantity（用户手动填写）
+    库存分布 = 物流({logistics_quantity}) + FBA库存({fba_inventory_quantity}) + FBA预留({fba_reserved_quantity})
+```
+
+### 11.5 上传行为对各表的影响
+
+| 操作 | amazon_products | amazon_fba_inventory | amazon_fba_reserved | logistics_tracking | sku_inventory_logs |
+|------|----------------|---------------------|--------------------|--------------------|-------------------|
+| 商品管理上传 | 全量覆盖（DELETE + INSERT） | 不影响 | 不影响 | 不影响 | 写日志 |
+| 物流上传SKU | 新建（不存在则创建，quantity=0） | 不影响 | 不影响 | 更新 sku_list JSON | 写日志 |
+| 同步商品 | 覆盖更新（按FBA仓库批次） | 不影响 | 不影响 | 不影响 | 写日志 |
+| FBA库存上传 | 不影响 | 全量覆盖 | 不影响 | 不影响 | 写日志 |
+| FBA预留上传 | 不影响 | 不影响 | 全量覆盖 | 不影响 | 写日志 |
+| 订单上传 | 不影响 | 不影响 | 不影响 | 不影响 | 不写日志（订单不影响库存） |
+
+### 11.6 upload_batch 批次标识规范
+
+| 来源 | 格式示例 | 说明 |
+|------|---------|------|
+| 商品管理上传 | `PRD_{时间戳}_{随机数}` | 商品模块 |
+| 物流上传SKU | `logistics_{FBA仓库编号}` | 物流模块，同一批次可多次同步 |
+| FBA库存上传 | `FBA_INV_{时间戳}_{随机数}` | FBA库存模块 |
+| FBA预留上传 | `FBA_RSV_{时间戳}_{随机数}` | FBA预留模块 |
+
+### 11.7 库存数据的"可售"与"在途"区分
+
+| 字段/来源 | 含义 | 存储位置 |
+|---------|------|---------|
+| `amazon_products.quantity` | **可售库存** | amazon_products |
+| `amazon_fba_inventory.available_quantity` | FBA **可售**数量 | amazon_fba_inventory |
+| `logistics_tracking.sku_list[].quantity` | 物流在**途**数量 | logistics_tracking |
+| `amazon_fba_reserved.total_reserved` | FBA **预留**数量 | amazon_fba_reserved |
+
+**原则**：物流数量不等于可售库存，因为货还在途中未入FBA仓。只有FBA仓库确认收货后，数量才转入FBA可售库存。
