@@ -521,6 +521,9 @@
     >
       <InventoryAlerts @close="alertsDialogVisible = false" />
     </el-dialog>
+
+    <!-- 库存详情对话框 -->
+    <InventoryDetail ref="inventoryDetailRef" />
   </div>
 </template>
 
@@ -546,6 +549,7 @@ import {
 import { apiService } from '../../utils/api'
 import UploadDialog from '../../components/UploadDialog.vue'
 import InventoryAlerts from './components/InventoryAlerts.vue'
+import InventoryDetail from './components/InventoryDetail.vue'
 
 // 数据状态
 const loading = ref(false)
@@ -615,6 +619,7 @@ const visibleColumns = computed(() => {
 // 对话框控制
 const uploadDialogVisible = ref(false)
 const alertsDialogVisible = ref(false)
+const inventoryDetailRef = ref(null)
 
 // 打开上传对话框
 const showUploadDialog = () => {
@@ -801,9 +806,7 @@ const handleUploadSuccess = () => {
 
 // 商品操作
 const viewDetail = (row) => {
-  // 跳转到商品详情页
-  // router.push(`/fba/inventory/detail/${row.sku}`)
-  ElMessage.info('商品详情功能开发中')
+  inventoryDetailRef.value.open(row)
 }
 
 const createReplenishment = (row) => {
