@@ -16,7 +16,7 @@
         <el-button :icon="View" @click="viewAlerts">
           库存预警
         </el-button>
-        <el-button type="danger" :icon="Delete" @click="deleteAll">
+        <el-button type="danger" :icon="DeleteFilled" @click="deleteAll">
           删除全部
         </el-button>
       </div>
@@ -528,7 +528,7 @@ import {
   ArrowDown,
   ArrowUp,
   Location,
-  Delete
+  DeleteFilled
 } from '@element-plus/icons-vue'
 import { apiService } from '../../utils/api'
 import UploadDialog from '../../components/UploadDialog.vue'
