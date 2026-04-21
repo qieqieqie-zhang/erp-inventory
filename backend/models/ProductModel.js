@@ -374,24 +374,24 @@ class ProductModel extends BaseModel {
       }
 
       if (existing) {
-        // 覆盖更新：数量取物流数据，保留商品主图等已有字段
+        // 覆盖更新：店铺和批次取物流数据，数量固定为0（在途≠可售），保留商品主图等已有字段
         await this.query(
           `UPDATE amazon_products SET
             item_name = COALESCE(?, item_name),
-            quantity = ?,
+            quantity = COALESCE(quantity, 0),
             shop_id = ?,
             upload_batch = ?,
             updated_at = CURRENT_TIMESTAMP
           WHERE id = ?`,
-          [item.sku_name || existing.item_name, item.quantity || 0, shopId, batchPrefix, existing.id]
+          [item.sku_name || existing.item_name, shopId, batchPrefix, existing.id]
         );
         updated++;
       } else {
-        // 新建商品
+        // 新建商品：数量固定为0（物流在途，不算可售库存）
         await this.create({
           seller_sku: sku,
           item_name: item.sku_name || sku,
-          quantity: item.quantity || 0,
+          quantity: 0,
           shop_id: shopId,
           upload_batch: batchPrefix
         });
