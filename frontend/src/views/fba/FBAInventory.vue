@@ -16,6 +16,9 @@
         <el-button :icon="View" @click="viewAlerts">
           库存预警
         </el-button>
+        <el-button type="danger" :icon="Delete" @click="deleteAll">
+          删除全部
+        </el-button>
       </div>
     </div>
 
@@ -345,34 +348,14 @@
             </template>
           </el-table-column>
           <el-table-column
-            v-if="visibleColumns.country"
-            prop="country"
-            label="国家"
-            width="100"
-          />
-          <el-table-column
-            v-if="visibleColumns.inventory_age_days"
-            prop="inventory_age_days"
-            label="库龄(天)"
-            width="100"
-            align="center"
-            sortable
+            v-if="visibleColumns.fba_inventory_level_health_status"
+            prop="fba_inventory_level_health_status"
+            label="FBA库存健康状态"
+            width="130"
           >
             <template #default="{ row }">
-              <span :class="getAgeClass(row.inventory_age_days)">
-                {{ row.inventory_age_days }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column
-            v-if="visibleColumns.condition"
-            prop="condition"
-            label="商品状况"
-            width="100"
-          >
-            <template #default="{ row }">
-              <el-tag size="small" :type="getConditionType(row.condition)">
-                {{ row.condition }}
+              <el-tag size="small" :type="getHealthStatusType(row.fba_inventory_level_health_status)">
+                {{ row.fba_inventory_level_health_status || '-' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -544,7 +527,8 @@ import {
   Operation,
   ArrowDown,
   ArrowUp,
-  Location
+  Location,
+  Delete
 } from '@element-plus/icons-vue'
 import { apiService } from '../../utils/api'
 import UploadDialog from '../../components/UploadDialog.vue'
@@ -602,9 +586,10 @@ const columnOptions = ref([
   { prop: 'your_price', label: '单价', visible: true },
   { prop: 'sales_last_30_days', label: '售出件数', visible: true },
   { prop: 'sales_amount', label: '售出金额', visible: true },
-  { prop: 'country', label: '国家', visible: true },
-  { prop: 'inventory_age_days', label: '库龄', visible: true },
-  { prop: 'condition', label: '商品状况', visible: true },
+  { prop: 'fba_inventory_level_health_status', label: 'FBA库存健康状态', visible: true },
+  { prop: 'country', label: '国家', visible: false },
+  { prop: 'inventory_age_days', label: '库龄', visible: false },
+  { prop: 'condition', label: '商品状况', visible: false },
   { prop: 'last_updated', label: '最后更新', visible: true }
 ])
 
@@ -666,7 +651,7 @@ const fetchInventoryList = async () => {
       total_units: (item.available_quantity || 0) + (item.reserved_fc_transfer || 0),
       product_name: item.item_name || item.product_name || ''
     }))
-    pagination.value.total = data.total || 0
+    pagination.value.total = data.pagination?.total || 0
   } catch (error) {
     ElMessage.error(error.message || '获取库存列表失败')
     inventoryList.value = []
@@ -813,6 +798,33 @@ const createReplenishment = (row) => {
   ElMessage.info('补货功能开发中')
 }
 
+// 删除全部
+const deleteAll = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除所有FBA库存数据吗？此操作不可恢复！',
+      '警告',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    loading.value = true
+    await apiService.fba.inventory.deleteAll()
+    ElMessage.success('删除成功')
+    fetchInventoryList()
+    fetchOverviewData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除失败')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
 const handleMoreCommand = (row, command) => {
   switch (command) {
     case 'transfer':
@@ -899,6 +911,16 @@ const getConditionType = (condition) => {
     '损坏': 'danger'
   }
   return typeMap[condition] || 'info'
+}
+
+const getHealthStatusType = (status) => {
+  if (!status) return 'info'
+  const statusLower = status.toLowerCase()
+  if (statusLower.includes('healthy') || statusLower.includes('正常')) return 'success'
+  if (statusLower.includes('low stock') || statusLower.includes('低库存')) return 'warning'
+  if (statusLower.includes('excess') || statusLower.includes('积压')) return 'danger'
+  if (statusLower.includes('out of stock') || statusLower.includes('缺货')) return 'danger'
+  return 'info'
 }
 
 const getStockStatusType = (item) => {

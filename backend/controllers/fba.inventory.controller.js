@@ -282,6 +282,27 @@ class FBAInventoryController {
   }
 
   /**
+   * 删除所有FBA库存数据
+   */
+  async deleteAll(req, res) {
+    try {
+      await FBAInventoryModel.deleteAll()
+      res.json({
+        code: 200,
+        message: '删除成功',
+        data: null
+      })
+    } catch (error) {
+      console.error('删除FBA库存错误:', error)
+      res.status(500).json({
+        code: 500,
+        message: '服务器内部错误',
+        data: null
+      })
+    }
+  }
+
+  /**
    * 导出FBA库存数据
    */
   async exportData(req, res) {

@@ -382,6 +382,14 @@ class FBAInventoryModel extends BaseModel {
         days_of_supply ASC
     `);
   }
+
+  /**
+   * 删除所有FBA库存数据
+   * @returns {Promise<void>}
+   */
+  async deleteAll() {
+    await this.execute('DELETE FROM amazon_fba_inventory');
+  }
 }
 
 module.exports = new FBAInventoryModel();

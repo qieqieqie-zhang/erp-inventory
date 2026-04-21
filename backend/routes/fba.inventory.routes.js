@@ -61,9 +61,20 @@ router.get('/export',
  * @desc 按SKU获取FBA库存详情
  * @access Private
  */
-router.get('/detail/:sku', 
+router.get('/detail/:sku',
   authenticateToken,
   fbaInventoryController.getDetail
+);
+
+/**
+ * @route DELETE /api/fba/inventory/all
+ * @desc 删除所有FBA库存数据
+ * @access Private (管理员)
+ */
+router.delete('/all',
+  authenticateToken,
+  authorizeRoles(['admin']),
+  fbaInventoryController.deleteAll
 );
 
 module.exports = router;

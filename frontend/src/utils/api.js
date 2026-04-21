@@ -121,7 +121,8 @@ export const apiService = {
         params: { format },
         responseType: 'blob'
       }),
-      getDetail: (sku) => api.get(`/fba/inventory/detail/${sku}`)
+      getDetail: (sku) => api.get(`/fba/inventory/detail/${sku}`),
+      deleteAll: () => api.delete('/fba/inventory/all')
     },
     
     // FBA预留库存
