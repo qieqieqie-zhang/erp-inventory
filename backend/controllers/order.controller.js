@@ -229,6 +229,7 @@ class OrderController {
       } = req.query;
 
       // 构建查询选项
+      const dbDimension = dimension === 'yesterday' ? '1day' : dimension;
       const options = {
         page: parseInt(page),
         pageSize: parseInt(pageSize),
@@ -261,7 +262,6 @@ class OrderController {
       }
 
       // 映射维度值以适配数据库 ENUM ('1day', '3days', '7days', '14days', '30days')
-      const dbDimension = dimension === 'yesterday' ? '1day' : dimension;
 
       // 根据维度自动计算日期范围
       const dimensionRange = OrderController.calculateDateRange(dimension);

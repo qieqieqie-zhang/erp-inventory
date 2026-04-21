@@ -163,6 +163,12 @@ class OrderModel extends BaseModel {
     let sql = 'SELECT * FROM amazon_orders WHERE 1=1';
     const params = [];
 
+    // 时间维度过滤
+    if (dimension) {
+      sql += ' AND dimension = ?';
+      params.push(dimension);
+    }
+
     // 搜索条件
     if (search) {
       sql += ' AND (order_id LIKE ? OR seller_sku LIKE ? OR item_name LIKE ? OR buyer_name LIKE ?)';
@@ -234,6 +240,12 @@ class OrderModel extends BaseModel {
     
     let sql = 'SELECT COUNT(*) as count FROM amazon_orders WHERE 1=1';
     const params = [];
+
+    // 时间维度过滤
+    if (dimension) {
+      sql += ' AND dimension = ?';
+      params.push(dimension);
+    }
 
     if (search) {
       sql += ' AND (order_id LIKE ? OR seller_sku LIKE ? OR item_name LIKE ? OR buyer_name LIKE ?)';
