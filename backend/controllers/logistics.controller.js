@@ -617,6 +617,12 @@ class LogisticsController {
         console.error('[Logistics] 获取物流记录失败:', err.message);
       }
 
+      // 如果没有 fba_warehouse_number，但有物流记录，也取其 shop_id
+      // shopId 优先从物流记录本身取（不依赖上传SKU时传的参数）
+      if (logisticsRecord && shopId === null) {
+        shopId = logisticsRecord.shop_id || null;
+      }
+
       if (!fbaWarehouseNumber) {
         return res.status(400).json({
           code: 400,

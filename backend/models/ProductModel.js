@@ -353,7 +353,8 @@ class ProductModel extends BaseModel {
    * @returns {Promise<Object>} { updated, inserted }
    */
   async syncFromLogistics(items, logisticsId, fbaWarehouseNumber, shopId) {
-    const batchPrefix = `logistics_${fbaWarehouseNumber}`;
+    // 批次前缀用 logistics_ID 格式，与创建时保持一致
+    const batchPrefix = `logistics_${logisticsId}`;
     let updated = 0;
     let inserted = 0;
 
@@ -364,11 +365,11 @@ class ProductModel extends BaseModel {
       // 优先按 SKU + 批次匹配（找当前物流批次的产品）
       let existing = await this.findBySkuAndBatch(sku, batchPrefix);
 
-      // 未找到，则按 SKU 模糊匹配物流批次的产品
+      // 未找到，则按 SKU 匹配当前 logistics 批次（兼容旧数据）
       if (!existing) {
         const allBySku = await this.query(
-          'SELECT * FROM amazon_products WHERE seller_sku = ? AND upload_batch LIKE ?',
-          [sku, 'logistics_%']
+          'SELECT * FROM amazon_products WHERE seller_sku = ? AND upload_batch = ?',
+          [sku, batchPrefix]
         );
         if (allBySku.length > 0) existing = allBySku[0];
       }
