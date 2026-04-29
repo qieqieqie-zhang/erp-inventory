@@ -2,7 +2,7 @@ const BaseModel = require('./BaseModel');
 
 class ProductModel extends BaseModel {
   constructor() {
-    super('amazon_products');
+    super('product_master');
   }
 
   /**
@@ -12,7 +12,7 @@ class ProductModel extends BaseModel {
    */
   async findBySku(sku) {
     const rows = await this.query(
-      'SELECT * FROM amazon_products WHERE seller_sku = ?',
+      'SELECT * FROM product_master WHERE seller_sku = ?',
       [sku]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -20,12 +20,13 @@ class ProductModel extends BaseModel {
 
   /**
    * 批量插入或更新商品数据（全量覆盖）
-   * @param {Array} products 
-   * @param {string} uploadBatch 
+   * @param {Array} products
+   * @param {string} uploadBatch
    * @param {number} shopId 店铺ID（可选，如果不传则删除全部商品）
+   * @param {number} categoryId 分类ID（可选）
    * @returns {Promise<Object>}
    */
-  async bulkUpsert(products, uploadBatch, shopId = null) {
+  async bulkUpsert(products, uploadBatch, shopId = null, categoryId = null) {
     if (products.length === 0) {
       return { inserted: 0, updated: 0 };
     }
@@ -37,21 +38,22 @@ class ProductModel extends BaseModel {
     try {
       // 删除现有数据（全量覆盖或按店铺覆盖）
       if (shopId) {
-        await connection.execute('DELETE FROM amazon_products WHERE shop_id = ?', [shopId]);
+        await connection.execute('DELETE FROM product_master WHERE shop_id = ?', [shopId]);
       } else {
-        await connection.execute('DELETE FROM amazon_products');
+        await connection.execute('DELETE FROM product_master');
       }
 
       // 批量插入新数据
       const keys = [
-        'seller_sku', 'item_name', 'price', 'quantity', 'pending_quantity',
+        'seller_sku', 'item_name', 'product_name_cn', 'price', 'quantity', 'pending_quantity',
         'image_url', 'asin1', 'fulfillment_channel', 'status', 'open_date',
-        'listing_id', 'shop_id', 'upload_batch'
+        'listing_id', 'shop_id', 'upload_batch', 'category_id'
       ];
 
       const values = products.map(product => [
         product['seller-sku'] || product.seller_sku || '',
         product['item-name'] || product.item_name || '',
+        product.product_name_cn || '',
         parseFloat(product.price || product.price || 0),
         parseInt(product.quantity || product.quantity || 0),
         parseInt(product['pending-quantity'] || product.pending_quantity || 0),
@@ -62,7 +64,8 @@ class ProductModel extends BaseModel {
         product['open-date'] || product.open_date ? new Date(product['open-date'] || product.open_date) : null,
         product['listing-id'] || product.listing_id || '',
         shopId,
-        uploadBatch
+        uploadBatch,
+        categoryId
       ]);
 
       const placeholders = products.map(() => 
@@ -70,7 +73,7 @@ class ProductModel extends BaseModel {
       ).join(', ');
 
       const flattenedValues = values.flat();
-      const sql = `INSERT INTO amazon_products (${keys.join(', ')}) VALUES ${placeholders}`;
+      const sql = `INSERT INTO product_master (${keys.join(', ')}) VALUES ${placeholders}`;
       
       const [result] = await connection.execute(sql, flattenedValues);
 
@@ -105,17 +108,19 @@ class ProductModel extends BaseModel {
       maxQuantity = null
     } = options;
 
-    // 使用 LEFT JOIN 关联 FBA 库存、FBA 预留、物流 JSON 数据
+    // 使用 LEFT JOIN 关联 FBA 库存、FBA 预留、物流 JSON 数据、分类名称
     let sql = `
       SELECT
         p.*,
         COALESCE(fi.available_quantity, 0) AS fba_inventory_quantity,
-        COALESCE(fr.total_reserved, 0) AS fba_reserved_quantity,
+        COALESCE(fr.reserved_qty, 0) AS fba_reserved_quantity,
         COALESCE(lg.logistics_quantity, 0) AS logistics_quantity,
-        lgs.logistics_status
-      FROM amazon_products p
+        lgs.logistics_status,
+        pc.category_name
+      FROM product_master p
       LEFT JOIN amazon_fba_inventory fi ON p.seller_sku = fi.seller_sku COLLATE utf8mb4_general_ci
-      LEFT JOIN amazon_fba_reserved fr ON p.seller_sku = fr.seller_sku COLLATE utf8mb4_general_ci
+      LEFT JOIN amazon_fba_reserved fr ON p.seller_sku = fr.sku COLLATE utf8mb4_general_ci
+      LEFT JOIN product_categories pc ON p.category_id = pc.id
       LEFT JOIN (
         SELECT lt_sku.sku_code, SUM(lt_sku.quantity) AS logistics_quantity
         FROM logistics_tracking lt
@@ -201,7 +206,7 @@ class ProductModel extends BaseModel {
   async countProducts(filters = {}) {
     const { search = '', status = '', channel = '', shop_id = '' } = filters;
     
-    let sql = 'SELECT COUNT(*) as count FROM amazon_products WHERE 1=1';
+    let sql = 'SELECT COUNT(*) as count FROM product_master WHERE 1=1';
     const params = [];
 
     if (search) {
@@ -243,7 +248,7 @@ class ProductModel extends BaseModel {
         SUM(CASE WHEN fulfillment_channel = '自发货' THEN 1 ELSE 0 END) as merchant_products,
         SUM(quantity) as total_quantity,
         SUM(pending_quantity) as total_pending
-      FROM amazon_products
+      FROM product_master
     `);
 
     return stats;
@@ -256,9 +261,30 @@ class ProductModel extends BaseModel {
   async getSkuList() {
     return this.query(`
       SELECT seller_sku as sku, item_name as name, asin1 as asin
-      FROM amazon_products 
+      FROM product_master
       ORDER BY seller_sku
     `);
+  }
+
+  /**
+   * 批量获取SKU对应的中文名称映射
+   * @param {Array<string>} skuList
+   * @returns {Promise<Object>} { sku: product_name_cn }
+   */
+  async getProductNameMapBySkus(skuList) {
+    if (!skuList || skuList.length === 0) return {};
+
+    const placeholders = skuList.map(() => '?').join(', ');
+    const rows = await this.query(
+      `SELECT seller_sku, product_name_cn FROM product_master WHERE seller_sku IN (${placeholders})`,
+      skuList
+    );
+
+    const map = {};
+    rows.forEach(row => {
+      map[row.seller_sku] = row.product_name_cn;
+    });
+    return map;
   }
 
   /**
@@ -311,7 +337,7 @@ class ProductModel extends BaseModel {
     
     values.push(sku);
     
-    const sql = `UPDATE amazon_products SET ${fields.join(', ')} WHERE seller_sku = ?`;
+    const sql = `UPDATE product_master SET ${fields.join(', ')} WHERE seller_sku = ?`;
     const result = await this.query(sql, values);
     return result.affectedRows > 0;
   }
@@ -323,7 +349,7 @@ class ProductModel extends BaseModel {
    */
   async deleteProduct(sku) {
     const [result] = await this.query(
-      'DELETE FROM amazon_products WHERE seller_sku = ?',
+      'DELETE FROM product_master WHERE seller_sku = ?',
       [sku]
     );
     return result.affectedRows > 0;
@@ -337,7 +363,7 @@ class ProductModel extends BaseModel {
    */
   async findBySkuAndBatch(sku, batchPrefix) {
     const rows = await this.query(
-      'SELECT * FROM amazon_products WHERE seller_sku = ? AND upload_batch LIKE ?',
+      'SELECT * FROM product_master WHERE seller_sku = ? AND upload_batch LIKE ?',
       [sku, `${batchPrefix}%`]
     );
     return rows.length > 0 ? rows[0] : null;
@@ -413,7 +439,7 @@ class ProductModel extends BaseModel {
       // 未找到，则按 SKU 匹配当前 logistics 批次（兼容旧数据）
       if (!existing) {
         const allBySku = await this.query(
-          'SELECT * FROM amazon_products WHERE seller_sku = ? AND upload_batch = ?',
+          'SELECT * FROM product_master WHERE seller_sku = ? AND upload_batch = ?',
           [sku, batchPrefix]
         );
         if (allBySku.length > 0) existing = allBySku[0];
@@ -422,7 +448,7 @@ class ProductModel extends BaseModel {
       if (existing) {
         // 覆盖更新：店铺和批次取物流数据，数量固定为0（在途≠可售），更新配送渠道
         await this.query(
-          `UPDATE amazon_products SET
+          `UPDATE product_master SET
             item_name = COALESCE(?, item_name),
             shop_id = ?,
             upload_batch = ?,

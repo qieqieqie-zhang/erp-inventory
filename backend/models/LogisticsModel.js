@@ -254,6 +254,46 @@ class LogisticsModel extends BaseModel {
       { value: 'delivered', label: '已派送' }
     ];
   }
+
+  /**
+   * 获取在途SKU数量（按SKU去重）
+   * @param {number} shopId - 店铺ID（可选）
+   * @returns {Promise<number>} 唯一SKU数量
+   */
+  async getInTransitSkuCount(shopId = null) {
+    // 物流在途 SKU 数：统计所有物流记录中的唯一 SKU（包含 pending/shipped/in_transit 等状态）
+    let sql = `
+      SELECT * FROM logistics_tracking
+      WHERE logistics_status IN ('pending', 'shipped', 'in_transit')
+    `;
+    const params = [];
+
+    if (shopId) {
+      sql += ' AND shop_id = ?';
+      params.push(shopId);
+    }
+
+    const rows = await this.query(sql, params);
+    const skuSet = new Set();
+
+    for (const item of rows) {
+      try {
+        const skuList = typeof item.sku_list === 'string' ? JSON.parse(item.sku_list) : (item.sku_list || []);
+        for (const skuItem of skuList) {
+          const sku = skuItem.sku_code || skuItem.sku;
+          if (sku) {
+            skuSet.add(sku);
+          }
+        }
+      } catch (e) {
+        if (item.sku_code) {
+          skuSet.add(item.sku_code);
+        }
+      }
+    }
+
+    return skuSet.size;
+  }
 }
 
 module.exports = new LogisticsModel();

@@ -1,6 +1,9 @@
 const FileParser = require('../utils/fileParser');
 const ProductModel = require('../models/ProductModel');
+const CategoryModel = require('../models/CategoryModel');
 const UploadLogModel = require('../models/UploadLogModel');
+const ProductNameSkuMappingModel = require('../models/ProductNameSkuMappingModel');
+const DomesticInventoryModel = require('../models/DomesticInventoryModel');
 
 class ProductController {
   /**
@@ -17,13 +20,14 @@ class ProductController {
       }
 
       const { path: filePath, originalname: filename } = req.file;
-      const shop_id = req.body.shop_id || null;
-      
+      const shop_id = req.body.shop_id ? parseInt(req.body.shop_id) : null;
+      const category_id = req.body.category_id || null;
+
       // 解析文件
       let parsedData;
       try {
         parsedData = FileParser.autoParseFile(filePath, [
-          'seller-sku', 'item-name', 'quantity'
+          'seller-sku'
         ]);
       } catch (parseError) {
         return res.status(400).json({
@@ -44,11 +48,132 @@ class ProductController {
         });
       }
 
+      // ===== 映射补全逻辑 =====
+      const enrichedData = [];
+      const mappingErrors = [];
+
+      for (let i = 0; i < validData.length; i++) {
+        const row = validData[i];
+        const rowNum = i + 2; // 行号从2开始（1是表头）
+
+        // 支持多种字段名格式
+        const sku = row['seller-sku'] || row['seller_sku'] || row['sku'] || '';
+        const nameCn = row['product-name-cn'] || row['product_name_cn'] || row['商品名称'] || row['name_cn'] || '';
+
+        const skuVal = (sku || '').toString().trim();
+        const nameCnVal = (nameCn || '').toString().trim();
+
+        let finalSku = skuVal;
+        let finalNameCn = nameCnVal;
+
+        // 情况1：两者都有，直接使用
+        if (skuVal && nameCnVal) {
+          // 保持原值
+        }
+        // 情况2：只有 sku，没有中文名称，尝试映射补全
+        else if (skuVal && !nameCnVal) {
+          if (!shop_id) {
+            mappingErrors.push({ row: rowNum, sku: skuVal, error: '缺少中文名称，且未指定店铺，无法从映射表查找' });
+            continue;
+          }
+          const mappedName = await ProductNameSkuMappingModel.findNameBySku(shop_id, skuVal);
+          if (mappedName === null) {
+            mappingErrors.push({ row: rowNum, sku: skuVal, error: '缺少中文名称，且未在映射表中找到对应关系' });
+            continue;
+          }
+          finalNameCn = mappedName;
+        }
+        // 情况3：只有中文名称，没有 sku，尝试映射补全
+        else if (!skuVal && nameCnVal) {
+          if (!shop_id) {
+            mappingErrors.push({ row: rowNum, name: nameCnVal, error: '缺少seller_sku，且未指定店铺，无法从映射表查找' });
+            continue;
+          }
+          const mappedSku = await ProductNameSkuMappingModel.findSkuByName(shop_id, nameCnVal);
+          if (mappedSku === null) {
+            mappingErrors.push({ row: rowNum, name: nameCnVal, error: '缺少seller_sku，且未在映射表中找到对应关系' });
+            continue;
+          }
+          finalSku = mappedSku;
+        }
+        // 情况4：两者都没有
+        else {
+          mappingErrors.push({ row: rowNum, error: 'seller_sku 和中文名称都为空，不允许导入' });
+          continue;
+        }
+
+        // 补全后的数据加入列表
+        enrichedData.push({
+          ...row,
+          'seller-sku': finalSku,
+          'product_name_cn': finalNameCn
+        });
+      }
+
+      if (mappingErrors.length > 0) {
+        return res.status(400).json({
+          code: 400,
+          message: `上传失败：${mappingErrors.length} 条记录无法处理`,
+          data: {
+            errors: mappingErrors.map(e => ({
+              row: e.row,
+              error: e.error,
+              sku: e.sku || null,
+              name: e.name || null
+            }))
+          }
+        });
+      }
+
+      // 如果文件中有 category_name 字段，转为 category_id
+      let finalCategoryId = category_id;
+      if (enrichedData[0] && enrichedData[0]['category_name']) {
+        const categoryName = enrichedData[0]['category_name'];
+        if (categoryName) {
+          try {
+            const cat = await CategoryModel.findByName(categoryName);
+            if (cat) {
+              finalCategoryId = cat.id;
+            }
+          } catch (e) {
+            // 分类查找失败，不影响上传
+          }
+        }
+      }
+
       // 生成上传批次
       const uploadBatch = `PRD_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-      // 保存到数据库（带上店铺ID）
-      const result = await ProductModel.bulkUpsert(validData, uploadBatch, shop_id);
+      // 保存到数据库（带上店铺ID和分类ID）
+      const result = await ProductModel.bulkUpsert(enrichedData, uploadBatch, shop_id, finalCategoryId);
+
+      // ===== 保存成功后，沉淀有完整映射的记录到 mapping 表 =====
+      for (const item of enrichedData) {
+        const sku = item['seller-sku'];
+        const nameCn = item['product_name_cn'];
+        if (sku && nameCn && shop_id) {
+          try {
+            await ProductNameSkuMappingModel.upsert({
+              shop_id,
+              product_name_cn: nameCn,
+              seller_sku: sku
+            });
+          } catch (e) {
+            console.error('映射表沉淀失败:', e.message);
+          }
+        }
+      }
+
+      // ===== 保存成功后，同步到国内库存 =====
+      try {
+        await DomesticInventoryModel.syncFromProductUpload(
+          enrichedData,
+          uploadBatch,
+          req.user?.username || 'system'
+        );
+      } catch (e) {
+        console.error('国内库存同步失败:', e.message);
+      }
 
       // 记录上传日志
       let errorFile = null;
@@ -65,7 +190,7 @@ class ProductController {
         module: 'product',
         filename: filename,
         totalRecords: parsedData.data.length,
-        successCount: validData.length,
+        successCount: enrichedData.length,
         failCount: invalidData.length,
         errorFile: errorFile
       });
@@ -76,7 +201,7 @@ class ProductController {
         message: '上传成功',
         data: {
           total: parsedData.data.length,
-          success: validData.length,
+          success: enrichedData.length,
           fail: invalidData.length,
           batch: uploadBatch,
           errorFile: errorFile ? `/uploads/errors/${errorFile.split('/').pop()}` : null

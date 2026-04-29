@@ -51,19 +51,19 @@ router.get('/export',
  * @desc 按SKU获取FBA预留库存详情
  * @access Private
  */
-router.get('/detail/:sku', 
+router.get('/detail/:sku',
   authenticateToken,
   fbaReservedController.getDetail
 );
 
 /**
- * @route GET /api/fba/reserved/distribution
- * @desc 获取预留类型分布统计
- * @access Private
+ * @route DELETE /api/fba/reserved/all
+ * @desc 清空所有FBA预留库存数据
+ * @access Private (管理员)
  */
-router.get('/distribution', 
+router.delete('/all',
   authenticateToken,
-  fbaReservedController.getReservationTypeDistribution
+  fbaReservedController.deleteAll
 );
 
 module.exports = router;

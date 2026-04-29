@@ -67,14 +67,6 @@ api.interceptors.response.use(
 
 // API接口定义
 export const apiService = {
-  // 数据看板
-  dashboard: {
-    getStats: (params) => api.get('/dashboard/stats', { params }),
-    getTopProducts: (params) => api.get('/dashboard/top-products', { params }),
-    getAlerts: (params) => api.get('/dashboard/alerts', { params }),
-    getRecentUploads: (params) => api.get('/dashboard/recent-uploads', { params })
-  },
-
   // 用户认证
   auth: {
     login: (credentials) => api.post('/auth/login', credentials),
@@ -84,29 +76,35 @@ export const apiService = {
   
   // 订单管理
   orders: {
-    // 获取订单列表（5个时间维度）
-    getList: (dimension, params) => api.get(`/orders/${dimension}/list`, { params }),
-    
-    // 上传订单文件
-    upload: (dimension, formData) => api.post(`/orders/${dimension}/upload`, formData),
-    
-    // 获取订单汇总
-    getSummary: (params) => api.get(`/orders/${params.dimension}/summary`, { params }),
-    
-    // 导出订单数据
-    exportData: (dimension, format) => api.get(`/orders/${dimension}/export`, {
-      params: { format },
+    // 上传订单报告
+    upload: (formData) => api.post('/orders/upload', formData),
+
+    // 获取订单汇总统计
+    getSummary: (params) => api.get('/orders/summary', { params }),
+
+    // 获取 SKU 销量汇总列表
+    getSkuList: (params) => api.get('/orders/sku-list', { params }),
+
+    // 获取 SKU 订单明细
+    getSkuDetails: (sku, params) => api.get(`/orders/sku/${sku}/details`, { params }),
+
+    // 获取图表数据
+    getChartsData: (params) => api.get('/orders/charts', { params }),
+
+    // 获取补货辅助数据
+    getReplenishment: (params) => api.get('/orders/replenishment', { params }),
+
+    // 导出 SKU 汇总数据
+    exportSkuSummary: (params) => api.get('/orders/export', {
+      params,
       responseType: 'blob'
     }),
-    
-    // 获取库存统计
-    getStats: (dimension) => api.get(`/orders/${dimension}/stats`),
-    
-    // 获取订单详情
-    getDetail: (id) => api.get(`/orders/detail/${id}`),
-    
-    // 获取低库存预警
-    getLowStockAlerts: () => api.get('/orders/alerts')
+
+    // 清空所有订单数据
+    deleteAll: () => api.delete('/orders/all'),
+
+    // 按SKU删除订单数据
+    deleteBySku: (sku) => api.delete(`/orders/sku/${sku}`)
   },
   
   // FBA库存管理
@@ -135,7 +133,8 @@ export const apiService = {
         responseType: 'blob'
       }),
       getDetail: (sku) => api.get(`/fba/reserved/detail/${sku}`),
-      getDistribution: () => api.get('/fba/reserved/distribution')
+      getDistribution: () => api.get('/fba/reserved/distribution'),
+      deleteAll: () => api.delete('/fba/reserved/all')
     }
   },
 
@@ -188,6 +187,71 @@ export const apiService = {
       params: { format },
       responseType: 'blob'
     })
+  },
+
+  // 商品资料 - 中文名称↔SKU映射管理
+  productNameSkuMapping: {
+    getList: (params) => api.get('/product-name-sku-mapping/list', { params }),
+    upsert: (data) => api.post('/product-name-sku-mapping/upsert', data),
+    delete: (id) => api.delete(`/product-name-sku-mapping/${id}`),
+    importFromProducts: (data) => api.post('/product-name-sku-mapping/import-from-products', data)
+  },
+
+  // 商品资料 - 分类管理
+  category: {
+    // 获取分类列表（分页）
+    getList: (params) => api.get('/category/list', { params }),
+
+    // 获取所有启用的分类（下拉用）
+    getAllEnabled: () => api.get('/category/all'),
+
+    // 获取单个分类
+    getById: (id) => api.get(`/category/${id}`),
+
+    // 创建分类
+    create: (data) => api.post('/category', data),
+
+    // 更新分类
+    update: (id, data) => api.put(`/category/${id}`, data),
+
+    // 删除分类
+    delete: (id) => api.delete(`/category/${id}`)
+  },
+
+  // 国内库存管理
+  domesticInventory: {
+    // 获取库存列表
+    getList: (params) => api.get('/domestic-inventory/list', { params }),
+
+    // 获取库存详情
+    getDetail: (sku) => api.get(`/domestic-inventory/${sku}`),
+
+    // 获取库存统计
+    getStats: () => api.get('/domestic-inventory/stats'),
+
+    // 创建库存记录
+    create: (data) => api.post('/domestic-inventory', data),
+
+    // 更新库存
+    update: (sku, data) => api.put(`/domestic-inventory/${sku}`, data),
+
+    // 删除库存记录
+    delete: (sku) => api.delete(`/domestic-inventory/${sku}`),
+
+    // 库存变动
+    changeStock: (data) => api.post('/domestic-inventory/change', data),
+
+    // 获取变动日志
+    getLogs: (params) => api.get('/domestic-inventory/logs', { params }),
+
+    // 获取日志统计
+    getLogStats: (params) => api.get('/domestic-inventory/log-stats', { params }),
+
+    // 获取业务类型列表
+    getBizTypes: () => api.get('/domestic-inventory/biz-types'),
+
+    // 获取变动类型列表
+    getChangeTypes: () => api.get('/domestic-inventory/change-types')
   },
   
   // 店铺管理
@@ -247,6 +311,14 @@ export const apiService = {
   skuInventoryLog: {
     getAllLogs: (params) => api.get('/sku-logs', { params }),
     getLogsBySku: (sku, params) => api.get(`/sku-logs/${sku}`, { params })
+  },
+
+  // 经营驾驶舱
+  cockpit: {
+    getOverview: (params) => api.get('/cockpit/overview', { params }),
+    getCoreTable: (params) => api.get('/cockpit/core-table', { params }),
+    getAlerts: (params) => api.get('/cockpit/alerts', { params }),
+    getTrends: (params) => api.get('/cockpit/trends', { params })
   }
 }
 

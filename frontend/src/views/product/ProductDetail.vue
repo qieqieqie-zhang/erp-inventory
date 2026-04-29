@@ -7,7 +7,7 @@
         type="text" 
         @click="$router.push('/products')"
       >
-        返回商品列表
+        返回商品资料列表
       </el-button>
     </div>
 
@@ -52,9 +52,29 @@
               <el-descriptions-item label="SKU" label-class-name="desc-label">
                 <strong>{{ product.seller_sku }}</strong>
               </el-descriptions-item>
-              
-              <el-descriptions-item label="商品名称">
+
+              <el-descriptions-item label="中文名称">
+                {{ product.product_name_cn || '未设置' }}
+              </el-descriptions-item>
+
+              <el-descriptions-item label="英文名称/原名">
                 {{ product.item_name || '未设置' }}
+              </el-descriptions-item>
+
+              <el-descriptions-item label="一级分类">
+                <el-tag v-if="product.category_name" type="warning">
+                  {{ product.category_name }}
+                </el-tag>
+                <span v-else class="text-muted">未分类</span>
+              </el-descriptions-item>
+
+              <!-- ASIN和品牌 -->
+              <el-descriptions-item label="ASIN">
+                {{ product.asin1 || '未设置' }}
+              </el-descriptions-item>
+
+              <el-descriptions-item label="品牌">
+                {{ product.brand || '未设置' }}
               </el-descriptions-item>
 
               <!-- 价格信息 -->
@@ -337,7 +357,7 @@
       >
         <template #extra>
           <el-button type="primary" @click="$router.push('/products')">
-            返回商品列表
+            返回商品资料列表
           </el-button>
         </template>
       </el-result>

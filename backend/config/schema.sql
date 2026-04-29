@@ -34,11 +34,29 @@ CREATE TABLE IF NOT EXISTS `system_users` (
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 1.5 商品一级分类表
+CREATE TABLE IF NOT EXISTS `product_categories` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `category_name` VARCHAR(100) NOT NULL UNIQUE COMMENT '分类名称（唯一）',
+  `sort_order` INT DEFAULT 0 COMMENT '排序序号（越小越靠前）',
+  `is_enabled` TINYINT DEFAULT 1 COMMENT '是否启用：1-启用，0-停用',
+  `remark` VARCHAR(255) COMMENT '备注说明',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_sort_order` (`sort_order`),
+  INDEX `idx_is_enabled` (`is_enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 2. 商品库存表（所有商品报告）
-CREATE TABLE IF NOT EXISTS `amazon_products` (
+CREATE TABLE IF NOT EXISTS `product_master` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `seller_sku` VARCHAR(100) NOT NULL UNIQUE,
-  `item_name` TEXT,
+  `item_name` TEXT COMMENT '商品名称（英文/原名）',
+  `product_name_cn` VARCHAR(255) DEFAULT '' COMMENT '商品中文名称',
+  `category_id` INT DEFAULT NULL COMMENT '一级分类ID',
+  `parent_asin` VARCHAR(20) DEFAULT '' COMMENT '父ASIN',
+  `child_asin` VARCHAR(20) DEFAULT '' COMMENT '子ASIN',
+  `brand` VARCHAR(100) DEFAULT '' COMMENT '品牌',
   `price` DECIMAL(10, 2),
   `quantity` INT DEFAULT 0 COMMENT '可售库存',
   `pending_quantity` INT DEFAULT 0 COMMENT '待处理库存',
@@ -46,6 +64,7 @@ CREATE TABLE IF NOT EXISTS `amazon_products` (
   `asin1` VARCHAR(20),
   `fulfillment_channel` VARCHAR(50) COMMENT 'FBA / 自发货',
   `status` VARCHAR(50) COMMENT 'Active/Inactive',
+  `remark` TEXT COMMENT '备注',
   `open_date` DATETIME,
   `listing_id` VARCHAR(100),
   `shop_id` INT COMMENT '关联店铺ID',
@@ -55,10 +74,76 @@ CREATE TABLE IF NOT EXISTS `amazon_products` (
   INDEX `idx_asin` (`asin1`),
   INDEX `idx_status` (`status`),
   INDEX `idx_channel` (`fulfillment_channel`),
-  INDEX `idx_shop` (`shop_id`)
+  INDEX `idx_shop` (`shop_id`),
+  INDEX `idx_category` (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. 订单表（5个时间维度独立存储）
+-- 3. 订单原始表（按 purchase_date 动态计算时间范围）
+CREATE TABLE IF NOT EXISTS `amazon_order_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `store_id` INT COMMENT '关联店铺ID',
+  `upload_batch` VARCHAR(50) COMMENT '上传批次',
+
+  -- 订单核心字段
+  `amazon_order_id` VARCHAR(100) NOT NULL COMMENT '亚马逊订单号',
+  `merchant_order_id` VARCHAR(100) COMMENT '商家订单号',
+  `purchase_date` DATETIME COMMENT '购买时间',
+  `last_updated_date` DATETIME COMMENT '最后更新时间',
+  `order_status` VARCHAR(50) COMMENT '订单状态',
+  `fulfillment_channel` VARCHAR(50) COMMENT '配送渠道',
+  `sales_channel` VARCHAR(100) COMMENT '销售渠道',
+  `order_channel` VARCHAR(100) COMMENT '订单渠道',
+  `ship_service_level` VARCHAR(50) COMMENT '运输服务级别',
+
+  -- 商品明细字段
+  `product_name` TEXT COMMENT '商品名称',
+  `sku` VARCHAR(100) COMMENT 'SKU',
+  `asin` VARCHAR(20) COMMENT 'ASIN',
+  `item_status` VARCHAR(50) COMMENT '项目状态',
+  `quantity` INT DEFAULT 0 COMMENT '购买数量',
+  `currency` VARCHAR(10) COMMENT '币种',
+  `item_price` DECIMAL(12, 2) DEFAULT 0 COMMENT '商品售价',
+  `item_tax` DECIMAL(12, 2) DEFAULT 0 COMMENT '商品税额',
+  `shipping_price` DECIMAL(12, 2) DEFAULT 0 COMMENT '运费',
+  `shipping_tax` DECIMAL(12, 2) DEFAULT 0 COMMENT '运费税额',
+  `gift_wrap_price` DECIMAL(12, 2) DEFAULT 0 COMMENT '礼品包装费',
+  `gift_wrap_tax` DECIMAL(12, 2) DEFAULT 0 COMMENT '礼品包装税额',
+  `item_promotion_discount` DECIMAL(12, 2) DEFAULT 0 COMMENT '商品促销折扣',
+  `ship_promotion_discount` DECIMAL(12, 2) DEFAULT 0 COMMENT '运费促销折扣',
+
+  -- 收货地址字段
+  `ship_city` VARCHAR(100) COMMENT '城市',
+  `ship_state` VARCHAR(100) COMMENT '州/省',
+  `ship_postal_code` VARCHAR(50) COMMENT '邮编',
+  `ship_country` VARCHAR(100) COMMENT '国家',
+
+  -- 扩展字段
+  `promotion_ids` TEXT COMMENT '促销ID列表',
+  `is_business_order` VARCHAR(10) DEFAULT 'false' COMMENT '是否为企业订单',
+  `purchase_order_number` VARCHAR(100) COMMENT '采购订单号',
+  `price_designation` VARCHAR(50) COMMENT '价格指定',
+
+  -- 行唯一标识（同一订单同一SKU可能多行）
+  `order_item_id` VARCHAR(100) COMMENT '订单明细ID',
+
+  -- 时间戳
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  -- 索引
+  INDEX `idx_store_id` (`store_id`),
+  INDEX `idx_upload_batch` (`upload_batch`),
+  INDEX `idx_amazon_order_id` (`amazon_order_id`),
+  INDEX `idx_purchase_date` (`purchase_date`),
+  INDEX `idx_sku` (`sku`),
+  INDEX `idx_asin` (`asin`),
+  INDEX `idx_order_status` (`order_status`),
+  INDEX `idx_currency` (`currency`),
+  INDEX `idx_sales_channel` (`sales_channel`),
+  INDEX `idx_ship_country` (`ship_country`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 旧订单表保留（兼容现有代码，逐步废弃）
 CREATE TABLE IF NOT EXISTS `amazon_orders` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `order_item_id` VARCHAR(100) NOT NULL,
@@ -151,18 +236,18 @@ CREATE TABLE IF NOT EXISTS `amazon_fba_inventory` (
 -- 5. FBA 预留库存表
 CREATE TABLE IF NOT EXISTS `amazon_fba_reserved` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `seller_sku` VARCHAR(100) NOT NULL UNIQUE,
-  `item_name` TEXT,
-  `asin` VARCHAR(20),
-  `fnsku` VARCHAR(100),
-  `total_reserved` INT DEFAULT 0 COMMENT '总预留数量',
-  `customer_order_reserved` INT DEFAULT 0 COMMENT '买家订单预留',
-  `transfer_reserved` INT DEFAULT 0 COMMENT '调仓预留',
-  `warehouse_processing_reserved` INT DEFAULT 0 COMMENT '仓库处理预留',
-  `project_type` VARCHAR(100) COMMENT '项目类型',
-  `upload_batch` VARCHAR(50),
-  `upload_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX `idx_sku` (`seller_sku`),
+  `sku` VARCHAR(100) NOT NULL UNIQUE COMMENT 'SKU编号',
+  `product_name` TEXT COMMENT '商品名称',
+  `asin` VARCHAR(20) COMMENT 'ASIN',
+  `fnsku` VARCHAR(100) COMMENT 'FNSKU',
+  `reserved_qty` INT DEFAULT 0 COMMENT '报告预留总数',
+  `reserved_customerorders` INT DEFAULT 0 COMMENT '客户订单预留',
+  `reserved_fc_transfers` INT DEFAULT 0 COMMENT '仓间调拨预留',
+  `reserved_fc_processing` INT DEFAULT 0 COMMENT '仓内处理预留',
+  `program` VARCHAR(100) COMMENT '项目/计划',
+  `upload_batch` VARCHAR(50) COMMENT '上传批次',
+  `upload_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+  INDEX `idx_sku` (`sku`),
   INDEX `idx_asin` (`asin`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -258,5 +343,54 @@ CREATE TABLE IF NOT EXISTS `sku_inventory_logs` (
 INSERT INTO `system_users` (`username`, `password`, `role`, `real_name`, `status`) 
 VALUES ('admin', '$2a$10$N9qo8uLOickgx2ZMRZoMy.MrqK.3HKmK5vZR7zUOLN2t6V8Q2YJXW', 'admin', '系统管理员', 1)
 ON DUPLICATE KEY UPDATE `updated_at` = CURRENT_TIMESTAMP;
+
+-- 10. 商品资料上传时的中文名称↔SKU映射表（按店铺隔离）
+CREATE TABLE IF NOT EXISTS `product_name_sku_mapping` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `shop_id` INT COMMENT '关联店铺ID',
+  `product_name_cn` VARCHAR(255) NOT NULL COMMENT '商品中文名称',
+  `seller_sku` VARCHAR(100) NOT NULL COMMENT '卖家SKU',
+  `is_active` TINYINT DEFAULT 1 COMMENT '是否启用：1-启用，0-停用',
+  `source_type` VARCHAR(20) DEFAULT 'upload' COMMENT '来源类型：upload-上传',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_shop_name_sku` (`shop_id`, `product_name_cn`, `seller_sku`),
+  INDEX `idx_shop_id` (`shop_id`),
+  INDEX `idx_seller_sku` (`seller_sku`),
+  INDEX `idx_product_name_cn` (`product_name_cn`),
+  INDEX `idx_is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 11. 国内库存余额表（按中文名称管理）
+CREATE TABLE IF NOT EXISTS `domestic_inventory_stock` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `product_name_cn` VARCHAR(255) NOT NULL UNIQUE COMMENT '商品中文名称（国内业务唯一标识）',
+  `on_hand_qty` INT DEFAULT 0 COMMENT '在库库存数量',
+  `available_qty` INT DEFAULT 0 COMMENT '可用库存数量',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_product_name_cn` (`product_name_cn`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 12. 国内库存变动日志表（按中文名称管理）
+CREATE TABLE IF NOT EXISTS `domestic_inventory_log` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `product_name_cn` VARCHAR(255) NOT NULL COMMENT '商品中文名称',
+  `change_type` ENUM('in', 'out', 'adjust') NOT NULL COMMENT '变动类型：in-入库，out-出库，adjust-调整',
+  `biz_type` VARCHAR(50) NOT NULL COMMENT '业务类型：purchase-采购入库，return-退货入库，transfer-调拨入库，order-订单出库，damage-损耗出库，return_supplier-退货给供应商',
+  `quantity` INT NOT NULL COMMENT '变动数量（正数）',
+  `before_qty` INT DEFAULT 0 COMMENT '变动前库存',
+  `after_qty` INT DEFAULT 0 COMMENT '变动后库存',
+  `related_doc_type` VARCHAR(50) DEFAULT NULL COMMENT '关联单据类型',
+  `related_doc_id` VARCHAR(100) DEFAULT NULL COMMENT '关联单据ID',
+  `remark` TEXT COMMENT '备注说明',
+  `operator` VARCHAR(100) COMMENT '操作人',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_product_name_cn` (`product_name_cn`),
+  INDEX `idx_change_type` (`change_type`),
+  INDEX `idx_biz_type` (`biz_type`),
+  INDEX `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 密码为 admin123 的 bcrypt 哈希值

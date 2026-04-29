@@ -6,7 +6,7 @@
         <h1 class="page-title">商品上传</h1>
         <el-breadcrumb separator="/">
           <el-breadcrumb-item>
-            <el-link @click="$router.push('/products/list')">商品管理</el-link>
+            <el-link @click="$router.push('/products/list')">商品资料</el-link>
           </el-breadcrumb-item>
           <el-breadcrumb-item>商品上传</el-breadcrumb-item>
         </el-breadcrumb>
@@ -28,13 +28,14 @@
         <template #header>
           <div class="upload-header">
             <span class="upload-title">上传商品库存文件</span>
-            <el-link 
-              :icon="Download" 
-              @click="downloadTemplate"
+            <el-button
               type="primary"
+              :icon="Download"
+              @click="downloadTemplate"
+              link
             >
               下载模板
-            </el-link>
+            </el-button>
           </div>
         </template>
         
@@ -52,9 +53,9 @@
           <!-- 店铺选择 -->
           <div class="shop-select-section">
             <el-form-item label="选择店铺" required>
-              <el-select 
-                v-model="selectedShopId" 
-                placeholder="请选择要上传到的店铺" 
+              <el-select
+                v-model="selectedShopId"
+                placeholder="请选择要上传到的店铺"
                 filterable
                 style="width: 300px;"
               >
@@ -66,6 +67,24 @@
                 />
               </el-select>
               <span class="shop-tip">上传的商品将关联到选中的店铺</span>
+            </el-form-item>
+
+            <el-form-item label="一级分类">
+              <el-select
+                v-model="selectedCategoryId"
+                placeholder="可选，不选则不关联分类"
+                clearable
+                filterable
+                style="width: 300px;"
+              >
+                <el-option
+                  v-for="cat in categoryList"
+                  :key="cat.id"
+                  :label="cat.category_name"
+                  :value="cat.id"
+                />
+              </el-select>
+              <span class="shop-tip">可选，选择后上传的商品将关联到该分类</span>
             </el-form-item>
           </div>
           
@@ -93,7 +112,13 @@
           
           <!-- 文件预览区域 -->
           <div v-if="previewData" class="preview-section">
+
+            <!-- ========== 原始文件预览 ========== -->
             <el-card shadow="never" class="preview-card">
+              <template #header>
+                <span style="font-weight: bold;">原始文件预览（前10行）</span>
+              </template>
+
               <div class="file-info" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px;">
                 <div><strong>文件名：</strong>{{ previewData.fileName }}</div>
                 <div><strong>文件大小：</strong>{{ formatFileSize(previewData.fileSize) }}</div>
@@ -101,28 +126,35 @@
                 <div v-if="previewData.totalRows"><strong>总行数：</strong>{{ previewData.totalRows }} 行</div>
               </div>
               <div v-if="previewData.rows && previewData.rows.length" class="preview-content">
-                <div class="preview-title" style="font-weight: bold; margin-bottom: 8px;">内容预览（前{{ previewData.previewRows }}行）：</div>
                 <el-scrollbar max-height="300px">
-                  <el-table 
-                    :data="previewData.rows" 
-                    border 
-                    stripe 
+                  <el-table
+                    :data="previewData.rows"
+                    border
+                    stripe
                     size="small"
                     style="width: 100%; font-size: 12px;"
                   >
-                    <el-table-column 
-                      v-for="header in previewData.headers" 
-                      :key="header" 
-                      :prop="header" 
-                      :label="header" 
+                    <el-table-column
+                      v-for="header in previewData.headers"
+                      :key="header"
+                      :prop="header"
+                      :label="header"
                       :min-width="Math.max(header.length * 10 + 50, 100)"
                       show-overflow-tooltip
                     />
                   </el-table>
                 </el-scrollbar>
               </div>
+              <div v-else-if="previewData.noHeaderFound" class="preview-notice">
+                <el-alert
+                  title="未识别到有效表头"
+                  type="error"
+                  description="请确认文件包含 seller-sku 和 product_name_cn 列，并使用平铺表格格式，不要使用透视表、汇总表或多层表头。"
+                  show-icon
+                  :closable="false"
+                />
+              </div>
               <div v-else-if="previewData.content" class="preview-content">
-                <div class="preview-title" style="font-weight: bold; margin-bottom: 8px;">内容预览（前{{ previewData.previewRows }}行）：</div>
                 <pre class="content-text" style="background: #f5f7fa; padding: 12px; border-radius: 4px; max-height: 200px; overflow: auto; font-size: 12px; line-height: 1.4; margin: 0;">{{ previewData.content }}</pre>
               </div>
               <div v-else-if="previewData.isExcel" class="preview-notice">
@@ -196,12 +228,12 @@
           
           <!-- 上传按钮 -->
           <div class="upload-actions">
-            <el-button 
-              type="primary" 
-              :icon="UploadFilled" 
+            <el-button
+              type="primary"
+              :icon="UploadFilled"
               @click="handleUpload"
               :loading="uploadLoading"
-              :disabled="!currentFile"
+              :disabled="!currentFile || (previewData && previewData.noHeaderFound)"
             >
               开始上传
             </el-button>
@@ -267,15 +299,317 @@ const uploadResult = ref(null)
 const uploadHistory = ref([])
 const shopList = ref([])
 const selectedShopId = ref('')
+const categoryList = ref([])
+const selectedCategoryId = ref('')
 const previewData = ref(null)
+const fieldMapping = ref(null) // 字段映射结果
 
-// 格式化文件大小
+// 商品资料表头候选关键词（用于检测有效表头行）
+// 这些关键词用于在一堆行中找出最像商品资料表头的那一行
+const HEADER_CANDIDATES = [
+  'seller-sku', 'seller_sku', 'sku',
+  'product_name_cn', '中文名称', '商品中文名称', '商品名称',
+  'category_name', '分类', '一级分类', '类目',
+  'item-name', 'item_name', '英文名称',
+  'quantity', '库存', '数量',
+  'price', '价格', '售价',
+  'asin1', 'asin', 'ASIN',
+  'fulfillment_channel', 'fulfillment', '配送渠道',
+  'status', '状态'
+]
+
+// SKU 核心字段（在判定表头行时必须有这些才算是有效商品表头）
+const SKU_CORE_KEYWORDS = [
+  'seller-sku', 'seller_sku', 'sku'
+]
+
+// 中文名称核心字段
+const NAME_CORE_KEYWORDS = [
+  'product_name_cn', '中文名称', '商品中文名称', '商品名称'
+]
+
+// 判断某行是否是有效商品表头（必须包含至少1个SKU核心字段 + 1个中文名称核心字段，或者包含至少1个SKU核心字段且总匹配数>=2）
+const isProductHeaderRow = (row) => {
+  if (!row || row.length === 0) return false
+
+  // 将行转换为小写字符串用于关键词匹配（先trim去除前后空格）
+  const rowLower = row.map(h => String(h || '').trim().toLowerCase())
+
+  // 检查是否包含核心SKU字段
+  const hasSkuField = SKU_CORE_KEYWORDS.some(kw =>
+    rowLower.some(h => h.includes(kw))
+  )
+
+  // 检查是否包含中文名称字段
+  const hasNameField = NAME_CORE_KEYWORDS.some(kw =>
+    rowLower.some(h => h.includes(kw))
+  )
+
+  // 如果同时包含SKU和中文名称核心字段，一定是表头
+  if (hasSkuField && hasNameField) return true
+
+  // 否则要求：包含至少1个核心字段 + 总匹配数>=2
+  let matchCount = 0
+  for (const keyword of HEADER_CANDIDATES) {
+    if (rowLower.some(h => h.includes(keyword))) {
+      matchCount++
+    }
+  }
+
+  // 至少包含1个核心SKU字段，且总匹配数>=2
+  return hasSkuField && matchCount >= 2
+}
+
+// 从多个sheet中找出最可能包含商品资料的sheet
+const findBestProductSheet = (workbook) => {
+  if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+    console.log('[ProductUpload] workbook没有SheetNames')
+    return { name: workbook.SheetNames[0], worksheet: workbook.Sheets[workbook.SheetNames[0]] }
+  }
+
+  console.log('[ProductUpload] 发现sheet数量:', workbook.SheetNames.length, workbook.SheetNames)
+
+  // 如果只有1个sheet，直接返回
+  if (workbook.SheetNames.length === 1) {
+    const sheetName = workbook.SheetNames[0]
+    console.log('[ProductUpload] 只有1个sheet，直接使用:', sheetName)
+    return { name: sheetName, worksheet: workbook.Sheets[sheetName] }
+  }
+
+  // 扫描所有sheet，找包含最多商品字段的那张
+  let bestSheet = null
+  let bestScore = 0
+
+  for (const sheetName of workbook.SheetNames) {
+    const worksheet = workbook.Sheets[sheetName]
+    // 读取前20行用于检测表头（使用明确的A1:Z20范围）
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', range: 'A1:Z20' })
+
+    console.log(`[ProductUpload] 检查sheet "${sheetName}"，行数:`, jsonData.length)
+
+    let sheetScore = 0
+    // 扫描前20行找表头行
+    for (let i = 0; i < Math.min(jsonData.length, 20); i++) {
+      if (isProductHeaderRow(jsonData[i])) {
+        sheetScore += 10
+        // 额外加分：如果找到seller-sku相关字段（先trim再小写）
+        const rowLower = jsonData[i].map(h => String(h || '').trim().toLowerCase())
+        if (rowLower.some(h => h.includes('seller') || h.includes('sku'))) {
+          sheetScore += 20
+        }
+        if (rowLower.some(h => h.includes('product') || h.includes('名称'))) {
+          sheetScore += 10
+        }
+        console.log(`[ProductUpload] sheet "${sheetName}" 第${i+1}行匹配表头，score+=${sheetScore}`)
+      }
+    }
+
+    console.log(`[ProductUpload] sheet "${sheetName}" 总分:`, sheetScore)
+
+    if (sheetScore > bestScore) {
+      bestScore = sheetScore
+      bestSheet = sheetName
+    }
+  }
+
+  const sheetName = bestSheet || workbook.SheetNames[0]
+  console.log('[ProductUpload] 最佳sheet:', sheetName, '分数:', bestScore)
+  return { name: sheetName, worksheet: workbook.Sheets[sheetName] }
+}
+
+// 从工作表中找出真实表头行
+const findProductHeaderRow = (worksheet) => {
+  // 读取前20行用于检测表头（使用明确的A1:Z20范围）
+  const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', range: 'A1:Z20' })
+
+  // 调试：记录实际读取到的行数
+  console.log('[ProductUpload] findProductHeaderRow读取到的行数:', jsonData.length)
+  if (jsonData.length > 0) {
+    console.log('[ProductUpload] 第一行内容:', JSON.stringify(jsonData[0]))
+  }
+
+  for (let i = 0; i < Math.min(jsonData.length, 20); i++) {
+    // 调试：检查每一行是否匹配
+    const trimmed = jsonData[i].map(h => String(h || '').trim().toLowerCase())
+    const matches = HEADER_CANDIDATES.filter(kw => trimmed.some(h => h.includes(kw)))
+    console.log(`[ProductUpload] 第${i+1}行匹配关键词:`, matches)
+
+    if (isProductHeaderRow(jsonData[i])) {
+      console.log(`[ProductUpload] 找到有效表头行: 第${i+1}行`)
+      return { headerRowIndex: i, headerRow: jsonData[i], dataRows: jsonData.slice(i + 1) }
+    }
+  }
+
+  // 扫描完20行都没找到，返回null让调用方知道需要报错
+  console.log('[ProductUpload] 未找到有效表头行')
+  return null
+}
+
+// 解析Excel文件（商品上传专用）
+const parseProductExcel = (data) => {
+  const workbook = XLSX.read(data, { type: 'array' })
+
+  // 找最合适的sheet
+  const { name: sheetName, worksheet } = findBestProductSheet(workbook)
+
+  // 找真实表头行
+  const result = findProductHeaderRow(worksheet)
+
+  // 没找到有效表头
+  if (!result) {
+    return {
+      sheetName,
+      headerRowIndex: -1,
+      headers: [],
+      rows: [],
+      totalRows: 0,
+      noHeaderFound: true
+    }
+  }
+
+  const { headerRowIndex, headerRow, dataRows } = result
+
+  return {
+    sheetName,
+    headerRowIndex,
+    headers: headerRow.map((h, i) => (h !== '' ? String(h) : `列${i + 1}`)),
+    rows: dataRows.slice(0, 10).map(row => {
+      const obj = {}
+      headerRow.forEach((h, i) => {
+        const key = h !== '' ? String(h) : `列${i + 1}`
+        obj[key] = row[i] !== undefined && row[i] !== '' ? String(row[i]) : ''
+      })
+      return obj
+    }),
+    totalRows: dataRows.length,
+    noHeaderFound: false
+  }
+}
+const PRODUCT_FIELDS = [
+  { key: 'seller-sku', label: 'SKU', required: true, aliases: ['seller-sku', 'seller_sku', 'sku', 'SKU', '商品SKU', 'seller sku'] },
+  { key: 'product_name_cn', label: '中文名称', required: false, aliases: ['product_name_cn', '中文名称', '商品中文名称', '商品名称'] },
+  { key: 'category_name', label: '一级分类', required: false, aliases: ['category_name', '分类', '一级分类', '类目'] },
+  { key: 'item-name', label: '英文名称', required: false, aliases: ['item-name', 'item_name', 'item name', '商品名称', '英文名'] },
+  { key: 'quantity', label: '库存', required: false, aliases: ['quantity', 'qty', '库存', '数量'] },
+  { key: 'price', label: '价格', required: false, aliases: ['price', '价格', '售价'] },
+  { key: 'asin1', label: 'ASIN', required: false, aliases: ['asin1', 'asin', 'ASIN'] },
+  { key: 'fulfillment_channel', label: '配送渠道', required: false, aliases: ['fulfillment_channel', 'fulfillment channel', '配送渠道', '渠道'] },
+  { key: 'status', label: '状态', required: false, aliases: ['status', '状态', '商品状态'] }
+]
+
+// 识别文件中的字段
+const recognizeFields = (headers) => {
+  const mapping = []
+
+  PRODUCT_FIELDS.forEach(field => {
+    // 精确匹配优先（先trim）
+    let matchedHeader = headers.find(h => h.trim() === field.key)
+
+    // 然后尝试模糊匹配别名（不区分大小写，先trim）
+    if (!matchedHeader) {
+      matchedHeader = headers.find(h =>
+        field.aliases.some(alias => h.trim().toLowerCase() === alias.toLowerCase())
+      )
+    }
+
+    mapping.push({
+      key: field.key,
+      label: field.label,
+      required: field.required,
+      matched: !!matchedHeader,
+      sourceColumn: matchedHeader || null
+    })
+  })
+
+  return mapping
+}
+
+// 提取识别后的数据预览
+const getMappedDataPreview = () => {
+  if (!previewData.value || !fieldMapping.value) return []
+
+  const mappedRows = []
+  const dataRows = previewData.value.rows || []
+
+  dataRows.forEach(row => {
+    const mappedRow = {}
+    fieldMapping.value.forEach(field => {
+      if (field.matched && field.sourceColumn) {
+        mappedRow[field.key] = row[field.sourceColumn] || ''
+      } else {
+        mappedRow[field.key] = ''
+      }
+    })
+    mappedRows.push(mappedRow)
+  })
+
+  return mappedRows
+}
+
+// 检查是否缺少必要字段
+const hasRequiredFields = () => {
+  if (!fieldMapping.value) return false
+  return fieldMapping.value.some(f => f.required && f.matched)
+}
+
+// 获取缺失的必填字段
+const getMissingRequiredFields = () => {
+  if (!fieldMapping.value) return []
+  return fieldMapping.value.filter(f => f.required && !f.matched).map(f => f.label)
+}
 const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 B'
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// 解析CSV行，正确处理引号包裹的字段
+const parseCsvLine = (line, delimiter) => {
+  const result = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    const nextChar = line[i + 1]
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        // 转义的引号
+        current += '"'
+        i++ // 跳过下一个引号
+      } else {
+        // 开始或结束引号
+        inQuotes = !inQuotes
+      }
+    } else if (char === delimiter && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  result.push(current.trim())
+  return result
+}
+
+// 检测分隔符
+const detectDelimiter = (line) => {
+  // 常见分隔符
+  const delimiters = [',', '\t', '|', ';']
+  let bestDelimiter = ','
+  let maxCount = 0
+
+  for (const d of delimiters) {
+    const count = (line.match(new RegExp(d === '|' ? '\\|' : (d === '\t' ? '\t' : d), 'g')) || []).length
+    if (count > maxCount) {
+      maxCount = count
+      bestDelimiter = d
+    }
+  }
+  return bestDelimiter
 }
 
 // 生成文件预览
@@ -306,39 +640,63 @@ const generatePreview = (file) => {
         // 处理不同换行符：\r\n, \n, \r
         const lines = text.split(/\r\n|\n|\r/).filter(line => line.trim() !== '')
         preview.totalRows = lines.length
-        
+
         if (lines.length > 0) {
           // 自动检测分隔符
           const firstLine = lines[0]
-          let delimiter = ','
-          // 如果是txt或者第一行包含制表符，使用制表符
-          if (fileExt === '.txt' || firstLine.includes('\t')) {
-            delimiter = '\t'
-          } else if (!firstLine.includes(',') && firstLine.includes(' ')) {
-            // 如果既没有逗号也没有制表符，但有空格，尝试使用空格（处理某些复制粘贴的情况）
-            delimiter = / +/
+          const delimiter = detectDelimiter(firstLine)
+
+          // 解析所有行为二维数组
+          const allRows = lines.map(line => parseCsvLine(line, delimiter))
+
+          // 在前20行中查找真实表头
+          let headerRowIndex = -1
+          let headerRow = null
+
+          for (let i = 0; i < Math.min(allRows.length, 20); i++) {
+            if (isProductHeaderRow(allRows[i])) {
+              headerRowIndex = i
+              headerRow = allRows[i]
+              break
+            }
           }
-          
-          // 解析表头
-          const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^["']+|["']$/g, ''))
-          preview.headers = headers.filter(h => h !== '') // 过滤掉空表头
-          
-          // 解析数据行（最多10行）
+
+          // 没找到有效表头
+          if (headerRowIndex === -1) {
+            previewData.value = {
+              ...preview,
+              headers: [],
+              rows: [],
+              totalRows: lines.length,
+              noHeaderFound: true
+            }
+            fieldMapping.value = null
+            ElMessage.error('未识别到有效表头，请确认文件包含 seller-sku 和 product_name_cn 列，并使用平铺表格格式，不要使用透视表、汇总表或多层表头。')
+            return
+          }
+
+          // 使用找到的表头行
+          preview.headers = headerRow.filter(h => h !== '')
+
+          // 解析数据行（最多10行，从表头下一行开始）
           const dataRows = []
-          const maxRows = Math.min(10, lines.length - 1)
-          for (let i = 1; i <= maxRows; i++) {
-            const rowData = lines[i].split(delimiter).map(v => v.trim().replace(/^["']+|["']$/g, ''))
+          const maxRows = Math.min(10, allRows.length - headerRowIndex - 1)
+          for (let i = headerRowIndex + 1; i <= headerRowIndex + maxRows; i++) {
+            const rowData = allRows[i]
             const rowObj = {}
-            preview.headers.forEach((header, index) => {
+            headerRow.forEach((header, index) => {
               rowObj[header] = rowData[index] || ''
             })
             dataRows.push(rowObj)
           }
           preview.rows = dataRows
+          preview.headerRowIndex = headerRowIndex
         }
-        
-        preview.content = lines.slice(0, 10).join('\n')
+
         previewData.value = { ...preview }
+
+        // 生成字段映射
+        fieldMapping.value = recognizeFields(preview.headers)
       } catch (error) {
         console.error('解析文件失败:', error)
         preview.content = '无法解析文件内容，请检查文件格式'
@@ -355,37 +713,41 @@ const generatePreview = (file) => {
       reader.readAsText(file.raw)
     }
   } else {
-    // Excel 文件：用 xlsx 库解析内容
+    // Excel 文件：用商品上传专用解析器
     const reader = new FileReader()
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[sheetName]
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' })
+        const parsed = parseProductExcel(data)
 
-        if (jsonData.length > 0) {
-          const headerRow = jsonData[0]
-          const dataRows = jsonData.slice(1, 11)
-
-          preview.headers = headerRow.map((h, i) => (h !== '' ? String(h) : `列${i + 1}`))
-          preview.totalRows = jsonData.length - 1
-          preview.previewRows = dataRows.length
-
-          preview.rows = dataRows.map(row => {
-            const obj = {}
-            preview.headers.forEach((header, i) => {
-              obj[header] = row[i] !== undefined && row[i] !== '' ? String(row[i]) : ''
-            })
-            return obj
-          })
+        // 如果没找到有效表头
+        if (parsed.noHeaderFound) {
+          previewData.value = {
+            ...preview,
+            headers: [],
+            rows: [],
+            totalRows: 0,
+            noHeaderFound: true
+          }
+          fieldMapping.value = null
+          ElMessage.error('未识别到有效表头，请确认文件包含 seller-sku 和 product_name_cn 列，并使用平铺表格格式，不要使用透视表、汇总表或多层表头。')
+          return
         }
 
+        preview.headers = parsed.headers
+        preview.totalRows = parsed.totalRows
+        preview.previewRows = parsed.rows.length
+        preview.rows = parsed.rows
+        preview.sheetName = parsed.sheetName
+        preview.headerRowIndex = parsed.headerRowIndex
+
         previewData.value = { ...preview }
+
+        // 生成字段映射
+        fieldMapping.value = recognizeFields(preview.headers)
       } catch (error) {
         console.error('解析Excel失败:', error)
-        previewData.value = { ...preview }
+        previewData.value = preview
       }
     }
     reader.onerror = () => {
@@ -450,6 +812,9 @@ const handleUpload = async () => {
   const formData = new FormData()
   formData.append('file', currentFile.value)
   formData.append('shop_id', selectedShopId.value)
+  if (selectedCategoryId.value) {
+    formData.append('category_id', selectedCategoryId.value)
+  }
   
   try {
     const result = await apiService.products.upload(formData)
@@ -496,38 +861,35 @@ const clearUploadResult = () => {
 
 // 下载模板
 const downloadTemplate = () => {
-  // 创建模板数据
-  const headers = ['seller-sku', 'item-name', 'quantity', 'price', 'asin1', 'fulfillment_channel', 'status']
-  const exampleRow = ['SKU123456', '示例商品', '100', '99.99', 'B07XXXXXXX', 'AMAZON_NA', 'active']
-  
+  const headers = ["seller-sku", "product_name_cn", "category_name", "item-name", "quantity", "price", "asin1", "fulfillment_channel", "status"]
+  const exampleRow = ["SKU123456", "示例中文名称", "电子产品", "Example Product", "100", "99.99", "B07XXXXXXX", "AMAZON_NA", "active"]
   const csvContent = [
-    headers.join(','),
-    exampleRow.join(','),
-    '# 说明：',
-    '# 1. seller-sku: 商品SKU（必填）',
-    '# 2. item-name: 商品名称',
-    '# 3. quantity: 可售库存数量',
-    '# 4. price: 商品价格',
-    '# 5. asin1: 商品ASIN',
-    '# 6. fulfillment_channel: 配送渠道（AMAZON_NA/AMAZON_EU/AMAZON_JP/MERCHANT）',
-    '# 7. status: 商品状态（active/out_of_stock/inactive）'
-  ].join('\n')
-  
-  // 创建下载链接
-  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' })
+    headers.join(","),
+    exampleRow.join(","),
+    "# 说明：",
+    "# 1. seller-sku: 商品SKU（必填）",
+    "# 2. product_name_cn: 商品中文名称",
+    "# 3. category_name: 一级分类名称（需在分类设置中已存在）",
+    "# 4. item-name: 英文/原商品名称",
+    "# 5. quantity: 可售库存数量",
+    "# 6. price: 商品价格",
+    "# 7. asin1: 商品ASIN",
+    "# 8. fulfillment_channel: 配送渠道（AMAZON_NA/AMAZON_EU/AMAZON_JP/MERCHANT）",
+    "# 9. status: 商品状态（active/out_of_stock/inactive）"
+  ].join("\n")
+  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8" })
   const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
+  const a = document.createElement("a")
   a.href = url
-  a.download = '商品库存模板.csv'
+  a.download = "商品库存模板.csv"
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
   window.URL.revokeObjectURL(url)
-  
-  ElMessage.success('模板下载成功')
+  ElMessage.success("模板下载成功")
 }
 
-// 下载错误文件
+// 下载错误文件// 下载错误文件
 const downloadErrorFile = () => {
   if (!uploadResult.value?.data?.errorFile) return
   
@@ -590,7 +952,18 @@ const loadShops = async () => {
 // 初始化
 onMounted(() => {
   loadShops()
+  loadCategories()
 })
+
+// 获取分类列表
+const loadCategories = async () => {
+  try {
+    const list = await apiService.category.getAllEnabled()
+    categoryList.value = list || []
+  } catch (error) {
+    console.error('获取分类列表失败:', error)
+  }
+}
 </script>
 
 <style scoped>
@@ -760,5 +1133,11 @@ onMounted(() => {
     flex-direction: column;
     gap: 10px;
   }
+}
+
+/* 识别后数据预览的空值样式 */
+.empty-cell {
+  color: #c0c4cc;
+  font-style: italic;
 }
 </style>

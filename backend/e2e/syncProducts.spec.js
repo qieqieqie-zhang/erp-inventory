@@ -21,7 +21,7 @@ test.describe('同步商品功能测试', () => {
     console.log('获取到token');
   });
 
-  test('同步商品后验证amazon_products表数据', async ({ request }) => {
+  test('同步商品后验证product_master表数据', async ({ request }) => {
     // 1. 先检查物流记录144是否存在
     console.log('检查物流记录144...');
     const logisticsResponse = await request.get('http://localhost:3000/api/logistics/detail/144', {

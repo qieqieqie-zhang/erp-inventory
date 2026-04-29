@@ -223,7 +223,7 @@ class ShopModel extends BaseModel {
    */
   async hasProducts(shopId) {
     const [result] = await this.query(
-      'SELECT COUNT(*) as count FROM amazon_products WHERE shop_id = ?',
+      'SELECT COUNT(*) as count FROM product_master WHERE shop_id = ?',
       [shopId]
     );
     return result.count > 0;

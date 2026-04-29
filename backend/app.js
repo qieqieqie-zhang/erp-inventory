@@ -16,6 +16,10 @@ const shopRoutes = require('./routes/shop.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const logisticsRoutes = require('./routes/logistics.routes');
 const skuInventoryLogRoutes = require('./routes/skuInventoryLog.routes');
+const cockpitRoutes = require('./routes/cockpit.routes');
+const categoryRoutes = require('./routes/category.routes');
+const domesticInventoryRoutes = require('./routes/domestic.inventory.routes');
+const productNameSkuMappingRoutes = require('./routes/product.name.sku.mapping.routes');
 
 // 导入中间件
 const { authenticateToken, authorizeRoles } = require('./middleware/auth.middleware');
@@ -51,6 +55,10 @@ app.use('/api/shops', authenticateToken, shopRoutes);
 app.use('/api/dashboard', authenticateToken, dashboardRoutes);
 app.use('/api/logistics', authenticateToken, logisticsRoutes);
 app.use('/api/sku-logs', authenticateToken, skuInventoryLogRoutes);
+app.use('/api/cockpit', authenticateToken, cockpitRoutes);
+app.use('/api/category', authenticateToken, categoryRoutes);
+app.use('/api/domestic-inventory', authenticateToken, domesticInventoryRoutes);
+app.use('/api/product-name-sku-mapping', authenticateToken, productNameSkuMappingRoutes);
 
 // 错误处理中间件（放在最后）
 app.use(errorHandler);

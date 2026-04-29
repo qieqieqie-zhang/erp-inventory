@@ -406,7 +406,7 @@ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ```
 
-#### 2. amazon_products (商品库存表)
+#### 2. product_master (商品库存表)
 ```sql
 id INT PRIMARY KEY AUTO_INCREMENT,
 seller_sku VARCHAR(100) UNIQUE NOT NULL,
@@ -603,9 +603,9 @@ operation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ```
 system_users (1) → (多) system_upload_logs
 system_users (1) → (多) system_operation_logs
-amazon_products (1) → (多) amazon_orders
-amazon_products (1) → (多) amazon_fba_inventory
-amazon_products (1) → (多) amazon_fba_reserved
+product_master (1) → (多) amazon_orders
+product_master (1) → (多) amazon_fba_inventory
+product_master (1) → (多) amazon_fba_reserved
 ```
 
 ---

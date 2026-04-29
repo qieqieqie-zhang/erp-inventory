@@ -15,7 +15,7 @@ const dashboardController = {
       let shopCondition = '';
       let shopParams = [];
       if (shop_id) {
-        shopCondition = 'AND shop_id = ?';
+        shopCondition = 'AND store_id = ?';
         shopParams = [shop_id];
       }
 
@@ -26,7 +26,7 @@ const dashboardController = {
           SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
           SUM(quantity) as total_quantity,
           SUM(CASE WHEN status = 'out_of_stock' THEN 1 ELSE 0 END) as out_of_stock
-        FROM amazon_products
+        FROM product_master
         WHERE 1=1 ${shopCondition}`,
         shopParams
       );
@@ -42,31 +42,33 @@ const dashboardController = {
         shopParams
       );
 
-      // 3. 订单统计（近7天和30天）
+      // 3. 订单统计（近7天和30天）- 使用 amazon_order_items
       const [orders7d] = await pool.execute(
         `SELECT
-          COUNT(*) as order_count,
-          SUM(total_amount) as total_amount
-        FROM amazon_orders
-        WHERE dimension = '7days'
-        ${shop_id ? 'AND shop_id = ?' : ''}`,
+          COUNT(DISTINCT amazon_order_id) as order_count,
+          SUM(item_price - item_promotion_discount) as total_amount
+        FROM amazon_order_items
+        WHERE purchase_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        AND order_status != 'Cancelled'
+        ${shop_id ? 'AND store_id = ?' : ''}`,
         shopParams
       );
 
       const [orders30d] = await pool.execute(
         `SELECT
-          COUNT(*) as order_count,
-          SUM(total_amount) as total_amount
-        FROM amazon_orders
-        WHERE dimension = '30days'
-        ${shop_id ? 'AND shop_id = ?' : ''}`,
+          COUNT(DISTINCT amazon_order_id) as order_count,
+          SUM(item_price - item_promotion_discount) as total_amount
+        FROM amazon_order_items
+        WHERE purchase_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        AND order_status != 'Cancelled'
+        ${shop_id ? 'AND store_id = ?' : ''}`,
         shopParams
       );
 
       // 4. 库存预警（低库存和零库存）
       const [alerts] = await pool.execute(
         `SELECT COUNT(*) as alert_count
-        FROM amazon_products
+        FROM product_master
         WHERE (quantity <= 10 AND quantity > 0) OR quantity = 0
         ${shopCondition}`,
         shopParams
@@ -128,7 +130,7 @@ const dashboardController = {
       let shopCondition = '';
       let shopParams = [];
       if (shop_id) {
-        shopCondition = 'AND shop_id = ?';
+        shopCondition = 'AND store_id = ?';
         shopParams = [shop_id];
       }
 
@@ -137,10 +139,11 @@ const dashboardController = {
           p.seller_sku as sku,
           p.item_name as name,
           COALESCE(SUM(o.quantity), 0) as sales,
-          COALESCE(SUM(o.total_amount), 0) as amount
-        FROM amazon_products p
-        LEFT JOIN amazon_orders o ON o.seller_sku = p.seller_sku
-          AND o.order_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+          COALESCE(SUM(o.item_price - o.item_promotion_discount), 0) as amount
+        FROM product_master p
+        LEFT JOIN amazon_order_items o ON o.sku = p.seller_sku
+          AND o.purchase_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+          AND o.order_status != 'Cancelled'
         WHERE 1=1 ${shopCondition}
         GROUP BY p.seller_sku, p.item_name
         ORDER BY sales DESC
@@ -192,7 +195,7 @@ const dashboardController = {
             WHEN quantity <= 10 THEN CONCAT('库存可供天数仅剩', GREATEST(1, quantity), '天')
             ELSE '库存积压超过100件'
           END as description
-        FROM amazon_products
+        FROM product_master
         WHERE (quantity <= 10 AND quantity > 0) OR quantity = 0
         ${shopCondition}
         LIMIT 20`,

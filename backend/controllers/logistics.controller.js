@@ -695,7 +695,7 @@ class LogisticsController {
         });
       }
 
-      // 同步 SKU 到商品主表（amazon_products）
+      // 同步 SKU 到商品主表（product_master）
       // 覆盖更新（按 SKU + 批次匹配），未匹配到则新建
       try {
         const ProductModel = require('../models/ProductModel');
@@ -707,7 +707,7 @@ class LogisticsController {
         );
         console.log(`[Logistics] 商品同步完成: 更新${result.updated}条，新建${result.inserted}条`);
       } catch (syncError) {
-        console.error('[Logistics] amazon_products 同步失败:', syncError.message);
+        console.error('[Logistics] product_master 同步失败:', syncError.message);
       }
 
       // 写库存变动日志

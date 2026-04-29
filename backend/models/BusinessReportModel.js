@@ -57,37 +57,34 @@ class BusinessReportModel extends BaseModel {
     const pageSizeNum = parseInt(pageSize, 10) || 20;
 
     let sql = `
-      SELECT 
+      SELECT
         id,
-        seller_sku as site,
-        report_month as report_date,
-        sales_amount as total_sales,
-        ordered_quantity as total_orders,
-        ordered_quantity as total_units,
-        sales_amount / NULLIF(ordered_quantity, 0) as average_sales_per_order,
-        conversion_rate,
-        page_views,
-        sessions as visitors,
-        sessions,
-        item_title,
+        seller_sku as sku,
+        item_title as title,
         parent_asin,
         child_asin,
+        report_month as report_date,
+        sessions,
+        page_views,
+        page_views_percentage,
+        product_session_percentage,
+        sales_amount / NULLIF(ordered_quantity, 0) as avg_unit_price,
+        ordered_quantity,
+        sales_amount,
         upload_batch,
         upload_time as created_at,
+        -- B2B字段
         sessions_b2b,
-        session_percentage_b2b,
         page_views_b2b,
-        page_views_percentage,
         page_views_percentage_b2b,
         recommended_offer_percentage,
         recommended_offer_percentage_b2b,
         ordered_quantity_b2b,
-        product_session_percentage,
         product_session_percentage_b2b,
         sales_amount_b2b,
         total_order_items,
         total_order_items_b2b
-      FROM amazon_business_report 
+      FROM amazon_business_report
       WHERE report_month BETWEEN ? AND ?
     `;
     const params = [startDate, endDate];
@@ -105,7 +102,7 @@ class BusinessReportModel extends BaseModel {
     }
 
     // 排序 - 只允许安全的列名
-    const allowedOrderBy = ['report_month', 'report_date', 'total_sales', 'total_orders', 'total_units', 'conversion_rate', 'average_sales_per_order', 'page_views', 'visitors', 'sessions'];
+    const allowedOrderBy = ['report_month', 'report_date', 'sku', 'parent_asin', 'child_asin', 'sessions', 'page_views', 'page_views_percentage', 'product_session_percentage', 'avg_unit_price', 'ordered_quantity', 'sales_amount'];
     const safeOrderBy = allowedOrderBy.includes(orderBy) ? orderBy : 'report_month';
     const safeOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     sql += ` ORDER BY ${safeOrderBy} ${safeOrder}`;
@@ -120,15 +117,13 @@ class BusinessReportModel extends BaseModel {
     return rows.map(row => {
       const converted = { ...row };
       
-      // 转换数字字段
+      // 转换数字字段（只转换真正的数字字段）
       const numericFields = [
-        'total_sales', 'total_orders', 'total_units', 'average_sales_per_order',
-        'conversion_rate', 'page_views', 'visitors', 'sessions',
-        'sessions_b2b', 'session_percentage_b2b', 'page_views_b2b',
-        'page_views_percentage', 'page_views_percentage_b2b',
+        'sessions', 'page_views', 'page_views_percentage',
+        'product_session_percentage', 'avg_unit_price', 'ordered_quantity', 'sales_amount',
+        'sessions_b2b', 'page_views_b2b', 'page_views_percentage_b2b',
         'recommended_offer_percentage', 'recommended_offer_percentage_b2b',
-        'ordered_quantity_b2b', 'product_session_percentage',
-        'product_session_percentage_b2b', 'sales_amount_b2b',
+        'ordered_quantity_b2b', 'product_session_percentage_b2b', 'sales_amount_b2b',
         'total_order_items', 'total_order_items_b2b'
       ];
       
@@ -137,6 +132,24 @@ class BusinessReportModel extends BaseModel {
           converted[field] = parseFloat(converted[field]) || 0;
         }
       });
+
+      // 确保 sku 和 title 是字符串类型
+      if (converted.sku !== undefined) {
+        converted.sku = String(converted.sku || '');
+      }
+      if (converted.title !== undefined) {
+        converted.title = String(converted.title || '');
+      }
+
+      // 计算页面浏览量占比（如果为空）
+      if (converted.sessions > 0 && converted.page_views > 0) {
+        converted.page_views_ratio = (converted.page_views / converted.sessions).toFixed(2);
+      }
+
+      // 平均单件售价
+      if (converted.ordered_quantity > 0 && converted.sales_amount > 0) {
+        converted.avg_unit_price = converted.sales_amount / converted.ordered_quantity;
+      }
       
       return converted;
     });
@@ -180,19 +193,18 @@ class BusinessReportModel extends BaseModel {
    */
   async getReportSummary(startDate, endDate) {
     const sql = `
-      SELECT 
+      SELECT
         COUNT(DISTINCT seller_sku) as total_skus,
         COUNT(*) as total_reports,
         SUM(sales_amount) as total_sales,
-        SUM(ordered_quantity) as total_orders,
         SUM(ordered_quantity) as total_units,
-        AVG(conversion_rate) as avg_conversion_rate,
-        SUM(sales_amount) / NULLIF(SUM(ordered_quantity), 0) as avg_sales_per_order,
         SUM(sessions) as total_sessions,
         SUM(page_views) as total_page_views,
+        AVG(product_session_percentage) as avg_conversion_rate,
+        SUM(sales_amount) / NULLIF(SUM(ordered_quantity), 0) as avg_unit_price,
         MIN(report_month) as first_report_date,
         MAX(report_month) as last_report_date
-      FROM amazon_business_report 
+      FROM amazon_business_report
       WHERE report_month BETWEEN ? AND ?
     `;
     const rows = await this.query(sql, [startDate, endDate]);
@@ -347,7 +359,7 @@ class BusinessReportModel extends BaseModel {
    */
   async getSalesBySite(startDate, endDate) {
     const sql = `
-      SELECT 
+      SELECT
         seller_sku as site,
         SUM(sales_amount) as total_sales,
         SUM(ordered_quantity) as total_orders,
@@ -371,6 +383,28 @@ class BusinessReportModel extends BaseModel {
       total_sessions: parseInt(row.total_sessions) || 0,
       report_count: parseInt(row.report_count) || 0
     }));
+  }
+
+  /**
+   * 删除业务报告（按ID）
+   * @param {number} id
+   * @returns {Promise<boolean>}
+   */
+  async delete(id) {
+    const result = await this.query(
+      'DELETE FROM amazon_business_report WHERE id = ?',
+      [id]
+    );
+    return result.affectedRows > 0;
+  }
+
+  /**
+   * 清空所有业务报告数据
+   * @returns {Promise<Object>}
+   */
+  async deleteAll() {
+    const result = await this.query('DELETE FROM amazon_business_report');
+    return { affectedRows: result.affectedRows || 0 };
   }
 }
 

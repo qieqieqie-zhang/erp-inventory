@@ -120,16 +120,22 @@ import {
   ShoppingCart,
   Document,
   User,
-  Upload,
   DataLine,
+  Upload,
+  Delete,
+  Warning,
   Wallet,
   Star,
   ArrowRight,
   Top,
-  Bottom
+  Bottom,
+  CaretTop,
+  CaretBottom
 } from '@element-plus/icons-vue'
+import { apiService } from '@/utils/api'
 
 const router = useRouter()
+const loading = ref(false)
 
 // 数据汇总卡片
 const summaryCards = ref([
@@ -325,8 +331,44 @@ const exportAllData = () => {
 
 // 刷新数据
 const refreshData = async () => {
-  ElMessage.success('数据汇总已刷新')
-  // TODO: 调用API获取最新数据
+  loading.value = true
+  try {
+    const [productStats, orderSummary, businessReportCount] = await Promise.allSettled([
+      apiService.products.getStats(),
+      apiService.orders.getSummary({}),
+      apiService.business.getReports({ page: 1, pageSize: 1 })
+    ])
+
+    // 更新商品数
+    if (productStats.status === 'fulfilled' && productStats.value) {
+      const stats = productStats.value
+      const totalProducts = (stats.total || 0)
+      summaryCards.value[0].value = totalProducts
+      dataModules.value[0].count = totalProducts
+    }
+
+    // 更新订单数
+    if (orderSummary.status === 'fulfilled' && orderSummary.value) {
+      const summary = orderSummary.value
+      const totalOrders = summary.total_orders || 0
+      summaryCards.value[1].value = totalOrders
+      dataModules.value[1].count = totalOrders
+    }
+
+    // 更新业务报告数
+    if (businessReportCount.status === 'fulfilled' && businessReportCount.value) {
+      const total = businessReportCount.value.pagination?.total || 0
+      summaryCards.value[2].value = total
+      dataModules.value[3].count = total
+    }
+
+    ElMessage.success('数据汇总已刷新')
+  } catch (error) {
+    console.error('刷新汇总数据失败:', error)
+    ElMessage.error('刷新失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 显示设置

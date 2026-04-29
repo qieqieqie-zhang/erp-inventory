@@ -228,7 +228,7 @@ SKU 级别商品库存管理，包含：
 
 **API**: `/api/product/list`、`/api/product/upload`、`/api/product/detail/:sku`、`/api/product/:sku`（PUT/DELETE）
 
-**数据表**: `amazon_products`
+**数据表**: `product_master`
 
 ---
 
@@ -418,7 +418,7 @@ JWT 令牌认证，包含：
 |------|------|
 | `shops` | 店铺管理表 |
 | `system_users` | 系统用户表 |
-| `amazon_products` | 商品库存表（主商品档案） |
+| `product_master` | 商品库存表（主商品档案） |
 | `amazon_orders` | 订单表（含 dimension 时间维度） |
 | `amazon_fba_inventory` | FBA库存表 |
 | `amazon_fba_reserved` | FBA预留库存表 |
@@ -448,7 +448,7 @@ JWT 令牌认证，包含：
 | created_at | TIMESTAMP | 创建时间 |
 | updated_at | TIMESTAMP | 更新时间 |
 
-**关联**：被 `amazon_products`、`amazon_orders`、`logistics_tracking` 的 `shop_id` 字段引用。
+**关联**：被 `product_master`、`amazon_orders`、`logistics_tracking` 的 `shop_id` 字段引用。
 
 ---
 
@@ -472,7 +472,7 @@ JWT 令牌认证，包含：
 
 ---
 
-### 10.3 amazon_products（商品库存表）
+### 10.3 product_master（商品库存表）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
@@ -549,7 +549,7 @@ JWT 令牌认证，包含：
 | upload_batch | VARCHAR(50) | 上传批次 |
 | upload_time | TIMESTAMP | 上传时间 |
 
-**关联**：通过 `seller_sku` 与 `amazon_products` 关联查询。
+**关联**：通过 `seller_sku` 与 `product_master` 关联查询。
 
 ---
 
@@ -605,7 +605,7 @@ JWT 令牌认证，包含：
 ]
 ```
 
-**关联**：通过 `fba_warehouse_number` 批次前缀 `logistics_{FBA仓库编号}` 关联 `amazon_products.upload_batch`。
+**关联**：通过 `fba_warehouse_number` 批次前缀 `logistics_{FBA仓库编号}` 关联 `product_master.upload_batch`。
 
 ---
 
@@ -684,14 +684,14 @@ JWT 令牌认证，包含：
 │  └───┬──────┘  └───┬──────┘  └───┬──────┘  └───┬──────┘  └───┬──────┘ │
 │      │             │             │             │             │          │
 │      ▼             ▼             ▼             ▼             ▼          │
-│  amazon_products  logistics_   amazon_fba_   amazon_fba_  amazon_     │
+│  product_master  logistics_   amazon_fba_   amazon_fba_  amazon_     │
 │  (quantity)     tracking       inventory      reserved     business_    │
 │                  (sku_list)   (available_   (total_       report      │
 │                                 quantity)    reserved)                  │
 │                     │                                                  │
 │                     │  JOIN（查询时关联，不重复存储）                   │
 │                     ▼                                                  │
-│              amazon_products                                       │
+│              product_master                                       │
 │           (库存分布列: 物流+FBA库存+FBA预留)                          │
 │                     │                                                  │
 │                     ▼                                                  │
@@ -705,7 +705,7 @@ JWT 令牌认证，包含：
 ### 11.2 商品管理 → 店铺（单向）
 
 ```
-商品管理上传 → amazon_products.shop_id = shops.id
+商品管理上传 → product_master.shop_id = shops.id
 ```
 
 商品表 `shop_id` 关联店铺，**店铺表是主数据**，商品引用店铺ID。
@@ -717,13 +717,13 @@ JWT 令牌认证，包含：
     │
     ├── 1. logistics_tracking.sku_list（JSON）存储SKU明细
     │
-    └── 2. 点击"同步商品" → amazon_products
+    └── 2. 点击"同步商品" → product_master
               │
               ├── 有同 SKU + 同批次（logistics_{FBA仓库编号）→ 覆盖更新
               ├── 有同 SKU 但不同批次（logistics_*）→ 覆盖更新
               └── 无该 SKU → 新建
               │
-              └── amazon_products.upload_batch = `logistics_{FBA仓库编号}`
+              └── product_master.upload_batch = `logistics_{FBA仓库编号}`
 ```
 
 **关键字段**：`fba_warehouse_number` 作为批次标识，同一FBA仓库编号的物流数据覆盖更新同一批次商品。
@@ -731,7 +731,7 @@ JWT 令牌认证，包含：
 ### 11.4 商品管理页面库存展示（JOIN查询）
 
 ```
-amazon_products（商品主档）
+product_master（商品主档）
     │
     ├── LEFT JOIN amazon_fba_inventory（通过 seller_sku）
     │       → fba_inventory_quantity = available_quantity
@@ -744,13 +744,13 @@ amazon_products（商品主档）
             → logistics_status = 最新一条物流记录的 status
 
 商品管理页面展示：
-    可售库存 = amazon_products.quantity（用户手动填写）
+    可售库存 = product_master.quantity（用户手动填写）
     库存分布 = 物流({logistics_quantity}) + FBA库存({fba_inventory_quantity}) + FBA预留({fba_reserved_quantity})
 ```
 
 ### 11.5 上传行为对各表的影响
 
-| 操作 | amazon_products | amazon_fba_inventory | amazon_fba_reserved | logistics_tracking | sku_inventory_logs |
+| 操作 | product_master | amazon_fba_inventory | amazon_fba_reserved | logistics_tracking | sku_inventory_logs |
 |------|----------------|---------------------|--------------------|--------------------|-------------------|
 | 商品管理上传 | 全量覆盖（DELETE + INSERT） | 不影响 | 不影响 | 不影响 | 写日志 |
 | 物流上传SKU | 新建（不存在则创建，quantity=0） | 不影响 | 不影响 | 更新 sku_list JSON | 写日志 |
@@ -772,7 +772,7 @@ amazon_products（商品主档）
 
 | 字段/来源 | 含义 | 存储位置 |
 |---------|------|---------|
-| `amazon_products.quantity` | **可售库存** | amazon_products |
+| `product_master.quantity` | **可售库存** | product_master |
 | `amazon_fba_inventory.available_quantity` | FBA **可售**数量 | amazon_fba_inventory |
 | `logistics_tracking.sku_list[].quantity` | 物流在**途**数量 | logistics_tracking |
 | `amazon_fba_reserved.total_reserved` | FBA **预留**数量 | amazon_fba_reserved |

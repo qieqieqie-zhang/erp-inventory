@@ -7,14 +7,14 @@
         <el-button type="primary" :icon="Upload" @click="showUploadDialog">
           上传预留库存报告
         </el-button>
+        <el-button type="danger" :icon="Delete" @click="handleClearAll">
+          清空列表
+        </el-button>
         <el-button :icon="Refresh" @click="refreshData">
           刷新
         </el-button>
         <el-button type="success" :icon="Download" @click="exportData">
           导出数据
-        </el-button>
-        <el-button :icon="View" @click="viewAlerts">
-          库存预警
         </el-button>
       </div>
     </div>
@@ -29,11 +29,9 @@
                 <el-icon><Box /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">{{ formatNumber(overviewData.totalReserved || 0) }}</div>
-                <div class="overview-label">总预留库存</div>
-                <div class="overview-change">
-                  <span class="overview-hint">件</span>
-                </div>
+                <div class="overview-value">{{ formatNumber(statsData.total_reserved_qty || 0) }}</div>
+                <div class="overview-label">报告预留总数</div>
+                <div class="overview-hint">件</div>
               </div>
             </div>
           </el-card>
@@ -43,59 +41,65 @@
           <el-card shadow="never" class="overview-card customer-orders">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><Goods /></el-icon>
+                <el-icon><User /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">{{ formatNumber(overviewData.customerOrders || 0) }}</div>
+                <div class="overview-value">{{ formatNumber(statsData.total_customerorders || 0) }}</div>
                 <div class="overview-label">客户订单预留</div>
-                <div class="overview-change">
-                  <span class="overview-hint">件</span>
-                </div>
+                <div class="overview-hint">件</div>
               </div>
             </div>
           </el-card>
         </el-col>
 
         <el-col :span="6">
-          <el-card shadow="never" class="overview-card transfer-in">
+          <el-card shadow="never" class="overview-card fc-transfers">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><Van /></el-icon>
+                <el-icon><Connection /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">{{ formatNumber(overviewData.transferIn || 0) }}</div>
-                <div class="overview-label">入库中转预留</div>
-                <div class="overview-change">
-                  <span class="overview-hint">件</span>
-                </div>
+                <div class="overview-value">{{ formatNumber(statsData.total_fc_transfers || 0) }}</div>
+                <div class="overview-label">仓间调拨预留</div>
+                <div class="overview-hint">件</div>
               </div>
             </div>
           </el-card>
         </el-col>
 
         <el-col :span="6">
-          <el-card shadow="never" class="overview-card transfer-out">
+          <el-card shadow="never" class="overview-card fc-processing">
             <div class="overview-item">
               <div class="overview-icon">
-                <el-icon><Sell /></el-icon>
+                <el-icon><Clock /></el-icon>
               </div>
               <div class="overview-content">
-                <div class="overview-value">{{ formatNumber(overviewData.transferOut || 0) }}</div>
-                <div class="overview-label">出库中转预留</div>
-                <div class="overview-change">
-                  <span class="overview-hint">件</span>
-                </div>
+                <div class="overview-value">{{ formatNumber(statsData.total_fc_processing || 0) }}</div>
+                <div class="overview-label">仓内处理预留</div>
+                <div class="overview-hint">件</div>
               </div>
             </div>
           </el-card>
         </el-col>
       </el-row>
+
+      <!-- 数据一致性提示 -->
+      <div v-if="statsData.data_warning" class="data-warning">
+        <el-alert type="warning" :closable="false" show-icon>
+          <template #title>
+            <strong>预留原因明细合计：{{ formatNumber(statsData.detail_total || 0) }} 件</strong>
+          </template>
+          <template #default>
+            {{ statsData.data_warning }}
+          </template>
+        </el-alert>
+      </div>
     </div>
 
     <!-- 筛选条件 -->
     <el-card shadow="never" class="filter-card">
       <div class="filter-container">
-        <el-form :model="filterForm" label-width="80px" :inline="true">
+        <el-form :model="filterForm" :inline="true">
           <el-form-item label="SKU搜索">
             <el-input
               v-model="filterForm.sku"
@@ -114,20 +118,32 @@
               @clear="handleSearch"
             />
           </el-form-item>
-          <el-form-item label="预留类型">
-            <el-select v-model="filterForm.reservedType" placeholder="全部类型" clearable>
+          <el-form-item label="ASIN搜索">
+            <el-input
+              v-model="filterForm.asin"
+              placeholder="输入ASIN"
+              clearable
+              @keyup.enter="handleSearch"
+              @clear="handleSearch"
+            />
+          </el-form-item>
+          <el-form-item label="预留原因">
+            <el-select v-model="filterForm.reasonFilter" placeholder="全部" clearable>
               <el-option label="全部" value="" />
               <el-option label="客户订单预留" value="customer_orders" />
-              <el-option label="入库中转预留" value="transfer_in" />
-              <el-option label="出库中转预留" value="transfer_out" />
+              <el-option label="仓间调拨中" value="fc_transfers" />
+              <el-option label="仓内处理中" value="fc_processing" />
+              <el-option label="高调拨占比" value="high_transfer_ratio" />
+              <el-option label="高处理占比" value="high_processing_ratio" />
             </el-select>
           </el-form-item>
-          <el-form-item label="状态">
-            <el-select v-model="filterForm.status" placeholder="全部状态" clearable>
+          <el-form-item label="数据状态">
+            <el-select v-model="filterForm.dataStatusFilter" placeholder="全部" clearable>
               <el-option label="全部" value="" />
-              <el-option label="有效" value="active" />
-              <el-option label="待释放" value="pending" />
-              <el-option label="已释放" value="released" />
+              <el-option label="数据一致" value="consistent" />
+              <el-option label="报告口径差异" value="inconsistent" />
+              <el-option label="无明细原因" value="no_detail" />
+              <el-option label="无预留" value="no_reserved" />
             </el-select>
           </el-form-item>
           <el-form-item>
@@ -144,144 +160,142 @@
         <div class="toolbar-left">
           <span class="total-count">共 {{ pagination.total }} 条记录</span>
         </div>
-        <div class="toolbar-right">
-          <el-button-group>
-            <el-button size="small" :type="viewMode === 'table' ? 'primary' : ''" @click="viewMode = 'table'">
-              <el-icon><Grid /></el-icon> 表格
-            </el-button>
-            <el-button size="small" :type="viewMode === 'card' ? 'primary' : ''" @click="viewMode = 'card'">
-              <el-icon><Menu /></el-icon> 卡片
-            </el-button>
-          </el-button-group>
-        </div>
       </div>
 
       <!-- 表格视图 -->
-      <div v-show="viewMode === 'table'">
-        <el-table
-          :data="inventoryList"
-          v-loading="loading"
-          style="width: 100%"
-          stripe
-          border
-          @sort-change="handleSortChange"
-        >
-          <el-table-column prop="sku" label="SKU" width="120" sortable fixed />
-          <el-table-column prop="product_name" label="商品名称" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="fnsku" label="FNSKU" width="130" />
-          <el-table-column prop="asin" label="ASIN" width="120" />
-          <el-table-column prop="total_reserved" label="总预留数量" width="110" align="center" sortable>
-            <template #default="{ row }">
-              <el-tag size="small" type="warning">{{ formatNumber(row.total_reserved || 0) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="reserved_type" label="预留类型" width="120">
-            <template #default="{ row }">
-              <el-tag size="small" :type="getReservedTypeTag(row.reserved_type)">
-                {{ getReservedTypeText(row.reserved_type) }}
+      <el-table
+        :data="inventoryList"
+        v-loading="loading"
+        style="width: 100%"
+        stripe
+        border
+      >
+        <el-table-column prop="reserved_tags" label="预留状态" width="220" fixed>
+          <template #header>
+            <span class="header-with-help">
+              预留状态
+              <ReservedStatusHelp />
+            </span>
+          </template>
+          <template #default="{ row }">
+            <div class="reserved-tags-container">
+              <el-tag
+                v-for="tag in getDisplayTags(row.reserved_tags || [])"
+                :key="tag.label"
+                size="small"
+                :type="getTagType(tag.type)"
+                class="reserved-tag"
+              >
+                {{ tag.label }}
               </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="fulfillment_center" label="履约中心" width="140" />
-          <el-table-column prop="country_code" label="国家" width="80">
-            <template #default="{ row }">
-              {{ row.country_code || 'US' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="status" label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag size="small" :type="getStatusTag(row.status)">
-                {{ getStatusText(row.status) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="latest_update_date" label="最后更新" width="160" sortable>
-            <template #default="{ row }">
-              {{ formatDateTime(row.latest_update_date) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="150" fixed="right">
-            <template #default="{ row }">
-              <el-button type="text" size="small" @click="viewDetails(row)">
-                详情
-              </el-button>
-              <el-dropdown @command="(command) => handleMoreCommand(row, command)" trigger="click">
-                <el-button type="text" size="small">
-                  更多 <el-icon><ArrowDown /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="history">历史记录</el-dropdown-item>
-                    <el-dropdown-item command="export" divided>导出</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-
-      <!-- 卡片视图 -->
-      <div v-show="viewMode === 'card'" class="card-view">
-        <el-row :gutter="20">
-          <el-col
-            v-for="item in inventoryList"
-            :key="item.sku"
-            :xs="24"
-            :sm="12"
-            :md="8"
-            :lg="6"
-            :xl="4"
-          >
-            <el-card shadow="hover" class="inventory-card">
-              <template #header>
-                <div class="card-header">
-                  <div class="sku">{{ item.sku }}</div>
-                  <el-tag size="small" :type="getStatusTag(item.status)">
-                    {{ getStatusText(item.status) }}
-                  </el-tag>
-                </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="sku" label="SKU" width="130" sortable fixed />
+        <el-table-column prop="product_name" label="商品名称" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="asin" label="ASIN" width="120" />
+        <el-table-column prop="reserved_qty" label="报告预留总数" width="120" align="center" sortable>
+          <template #default="{ row }">
+            <el-tag size="small" type="warning">{{ formatNumber(row.reserved_qty || 0) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reserved_customerorders" label="客户订单预留" width="120" align="center">
+          <template #header>
+            <span>客户订单预留</span>
+            <el-popover trigger="hover" placement="top">
+              <template #reference>
+                <el-icon class="header-help-icon"><QuestionFilled /></el-icon>
               </template>
-
-              <div class="card-content">
-                <div class="product-name">{{ item.product_name || '-' }}</div>
-
-                <div class="inventory-stats">
-                  <div class="stat-item">
-                    <span class="stat-label">总预留:</span>
-                    <span class="stat-value">{{ formatNumber(item.total_reserved || 0) }}</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">类型:</span>
-                    <span class="stat-value">{{ getReservedTypeText(item.reserved_type) }}</span>
-                  </div>
-                  <div class="stat-item">
-                    <span class="stat-label">履约中心:</span>
-                    <span class="stat-value">{{ item.fulfillment_center || '-' }}</span>
-                  </div>
-                </div>
-
-                <div class="additional-info">
-                  <div class="info-item">
-                    <el-icon><Location /></el-icon>
-                    <span>{{ item.country_code || 'US' }}</span>
-                  </div>
-                  <div class="info-item">
-                    <el-icon><Clock /></el-icon>
-                    <span>更新: {{ formatDateTime(item.latest_update_date) }}</span>
-                  </div>
+              <div class="field-help">
+                <div class="field-help-title">客户订单预留</div>
+                <div class="field-help-content">
+                  <p><strong>CSV字段：</strong>reserved_customerorders</p>
+                  <p><strong>含义：</strong>被客户订单占用的库存数量。</p>
+                  <p><strong>用途：</strong>通常表示等待付款、拣货或发货完成。</p>
+                  <p><strong>注意：</strong>这部分库存一般不应作为未来可售库存计算。</p>
                 </div>
               </div>
-
-              <div class="card-actions">
-                <el-button type="text" size="small" @click="viewDetails(item)">
-                  详情
-                </el-button>
+            </el-popover>
+          </template>
+          <template #default="{ row }">
+            <span>{{ formatNumber(row.reserved_customerorders || 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reserved_fc_transfers" label="仓间调拨预留" width="120" align="center">
+          <template #header>
+            <span>仓间调拨预留</span>
+            <el-popover trigger="hover" placement="top">
+              <template #reference>
+                <el-icon class="header-help-icon"><QuestionFilled /></el-icon>
+              </template>
+              <div class="field-help">
+                <div class="field-help-title">仓间调拨预留</div>
+                <div class="field-help-content">
+                  <p><strong>CSV字段：</strong>reserved_fc-transfers</p>
+                  <p><strong>含义：</strong>正在亚马逊运营中心之间调拨的库存数量。</p>
+                  <p><strong>用途：</strong>用于判断available偏低是否只是亚马逊调仓导致。</p>
+                  <p><strong>注意：</strong>它不是入库中库存，也不是不可售库存，通常未来可能释放。</p>
+                </div>
               </div>
-            </el-card>
-          </el-col>
-        </el-row>
-      </div>
+            </el-popover>
+          </template>
+          <template #default="{ row }">
+            <span>{{ formatNumber(row.reserved_fc_transfers || 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reserved_fc_processing" label="仓内处理预留" width="120" align="center">
+          <template #header>
+            <span>仓内处理预留</span>
+            <el-popover trigger="hover" placement="top">
+              <template #reference>
+                <el-icon class="header-help-icon"><QuestionFilled /></el-icon>
+              </template>
+              <div class="field-help">
+                <div class="field-help-title">仓内处理预留</div>
+                <div class="field-help-content">
+                  <p><strong>CSV字段：</strong>reserved_fc-processing</p>
+                  <p><strong>含义：</strong>在亚马逊仓库内部处理中库存。</p>
+                  <p><strong>用途：</strong>可能涉及接收、测量、分拣、调查或移除流程。</p>
+                  <p><strong>注意：</strong>如果长期不释放，需要关注或联系亚马逊支持。</p>
+                </div>
+              </div>
+            </el-popover>
+          </template>
+          <template #default="{ row }">
+            <span>{{ formatNumber(row.reserved_fc_processing || 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="recoverable_reserved_qty" label="可恢复预留" width="110" align="center">
+          <template #header>
+            <span>可恢复预留</span>
+            <el-popover trigger="hover" placement="top">
+              <template #reference>
+                <el-icon class="header-help-icon"><QuestionFilled /></el-icon>
+              </template>
+              <div class="field-help">
+                <div class="field-help-title">可恢复预留</div>
+                <div class="field-help-content">
+                  <p><strong>系统字段：</strong>recoverable_reserved_qty</p>
+                  <p><strong>公式：</strong>reserved_fc_transfers + reserved_fc_processing</p>
+                  <p><strong>含义：</strong>仓间调拨预留和仓内处理预留的合计，代表未来可能释放回可售或履约网络的库存。</p>
+                  <p><strong>用途：</strong>用于补货判断。available偏低时，如果可恢复预留较高，不应仅凭可售库存低就马上补货。</p>
+                  <p><strong>注意：</strong>不包含客户订单预留，因为客户订单预留通常已经被订单占用，不应作为未来可卖库存计算。</p>
+                </div>
+              </div>
+            </el-popover>
+          </template>
+          <template #default="{ row }">
+            <span class="text-primary">{{ formatNumber(row.recoverable_reserved_qty || 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button type="text" size="small" @click="viewDetails(row)">
+              详情
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
       <!-- 分页 -->
       <div class="pagination-container">
@@ -309,77 +323,229 @@
     />
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" :title="currentDetail?.sku + ' - 预留库存详情'" width="600">
+    <el-dialog
+      v-model="detailDialogVisible"
+      :title="currentDetail?.sku + ' - 预留库存详情'"
+      width="750px"
+    >
       <div class="detail-container" v-if="currentDetail">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="SKU">{{ currentDetail.sku }}</el-descriptions-item>
-          <el-descriptions-item label="FNSKU">{{ currentDetail.fnsku }}</el-descriptions-item>
-          <el-descriptions-item label="品名">{{ currentDetail.product_name }}</el-descriptions-item>
-          <el-descriptions-item label="ASIN">{{ currentDetail.asin || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="预留类型">{{ getReservedTypeText(currentDetail.reserved_type) }}</el-descriptions-item>
-          <el-descriptions-item label="预留数量">{{ formatNumber(currentDetail.total_reserved) }}</el-descriptions-item>
-          <el-descriptions-item label="履约中心">{{ currentDetail.fulfillment_center }}</el-descriptions-item>
-          <el-descriptions-item label="国家代码">{{ currentDetail.country_code || 'US' }}</el-descriptions-item>
-          <el-descriptions-item label="最后更新">{{ formatDateTime(currentDetail.latest_update_date) }}</el-descriptions-item>
-          <el-descriptions-item label="预计释放">{{ formatDateTime(currentDetail.expected_release_date) }}</el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag size="small" :type="getStatusTag(currentDetail.status)">
-              {{ getStatusText(currentDetail.status) }}
+        <!-- 顶部摘要区 -->
+        <div class="detail-summary">
+          <div class="summary-header">
+            <div class="summary-item">
+              <span class="label">SKU:</span>
+              <span class="value">{{ currentDetail.sku }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="label">ASIN:</span>
+              <span class="value">{{ currentDetail.asin }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="label">FNSKU:</span>
+              <span class="value">{{ currentDetail.fnsku }}</span>
+            </div>
+          </div>
+          <div class="summary-product">
+            <span class="product-name">{{ currentDetail.product_name }}</span>
+          </div>
+          <div class="summary-tags">
+            <span class="summary-tags-label">预留状态：</span>
+            <el-tag
+              v-for="tag in (currentDetail.reserved_tags || [])"
+              :key="tag.label"
+              size="small"
+              :type="getTagType(tag.type)"
+            >
+              {{ tag.label }}
             </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="备注" :span="2">{{ currentDetail.remarks || '无' }}</el-descriptions-item>
-        </el-descriptions>
+            <ReservedStatusHelp />
+          </div>
+          <div class="summary-stats">
+            <div class="stat-item">
+              <span class="stat-label">报告预留总数</span>
+              <span class="stat-value">{{ formatNumber(currentDetail.reserved_qty || 0) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">客户订单预留</span>
+              <span class="stat-value">{{ formatNumber(currentDetail.reserved_customerorders || 0) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">仓间调拨预留</span>
+              <span class="stat-value">{{ formatNumber(currentDetail.reserved_fc_transfers || 0) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">仓内处理预留</span>
+              <span class="stat-value">{{ formatNumber(currentDetail.reserved_fc_processing || 0) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">可恢复预留</span>
+              <span class="stat-value text-primary">{{ formatNumber(currentDetail.recoverable_reserved_qty || 0) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 预留原因拆解 -->
+        <div class="reason-breakdown">
+          <div class="breakdown-title">预留原因拆解</div>
+          <el-row :gutter="16">
+            <el-col :span="6">
+              <div class="breakdown-card customer-orders">
+                <div class="breakdown-value">{{ formatNumber(currentDetail.reserved_customerorders || 0) }}</div>
+                <div class="breakdown-label">客户订单预留</div>
+                <div class="breakdown-ratio">
+                  占比：{{ ((currentDetail.customer_order_ratio || 0) * 100).toFixed(1) }}%
+                </div>
+                <el-progress
+                  :percentage="((currentDetail.customer_order_ratio || 0) * 100)"
+                  :stroke-width="8"
+                  :color="'#409EFF'"
+                />
+              </div>
+            </el-col>
+            <el-col :span="6">
+              <div class="breakdown-card fc-transfers">
+                <div class="breakdown-value">{{ formatNumber(currentDetail.reserved_fc_transfers || 0) }}</div>
+                <div class="breakdown-label">仓间调拨预留</div>
+                <div class="breakdown-ratio">
+                  占比：{{ ((currentDetail.fc_transfer_ratio || 0) * 100).toFixed(1) }}%
+                </div>
+                <el-progress
+                  :percentage="((currentDetail.fc_transfer_ratio || 0) * 100)"
+                  :stroke-width="8"
+                  :color="'#67C23A'"
+                />
+              </div>
+            </el-col>
+            <el-col :span="6">
+              <div class="breakdown-card fc-processing">
+                <div class="breakdown-value">{{ formatNumber(currentDetail.reserved_fc_processing || 0) }}</div>
+                <div class="breakdown-label">仓内处理预留</div>
+                <div class="breakdown-ratio">
+                  占比：{{ ((currentDetail.fc_processing_ratio || 0) * 100).toFixed(1) }}%
+                </div>
+                <el-progress
+                  :percentage="((currentDetail.fc_processing_ratio || 0) * 100)"
+                  :stroke-width="8"
+                  :color="'#E6A23C'"
+                />
+              </div>
+            </el-col>
+            <el-col :span="6">
+              <div class="breakdown-card recoverable">
+                <div class="breakdown-value">{{ formatNumber(currentDetail.recoverable_reserved_qty || 0) }}</div>
+                <div class="breakdown-label">可恢复预留</div>
+                <div class="breakdown-ratio">
+                  公式：仓间+仓内
+                </div>
+                <el-progress
+                  :percentage="100"
+                  :stroke-width="8"
+                  :color="'#909399'"
+                  :show-text="false"
+                />
+              </div>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 数据校验说明 -->
+        <div class="data-validation-section">
+          <div class="section-title">
+            <el-icon><Warning /></el-icon>
+            数据校验说明
+          </div>
+          <el-descriptions :column="3" border size="small">
+            <el-descriptions-item label="报告预留总数">
+              {{ formatNumber(currentDetail.reserved_qty || 0) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="预留原因明细合计">
+              {{ formatNumber(currentDetail.reserved_detail_total || 0) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="差异">
+              <span :class="currentDetail.reserved_difference !== 0 ? 'text-danger' : ''">
+                {{ currentDetail.reserved_difference || 0 }}
+              </span>
+            </el-descriptions-item>
+          </el-descriptions>
+          <div class="validation-note">
+            <p>预留原因明细合计 = 客户订单预留 + 仓间调拨预留 + 仓内处理预留。</p>
+            <p>差异 = 报告预留总数 - 预留原因明细合计。</p>
+            <p v-if="currentDetail.reserved_difference !== 0" class="warning-text">
+              如果差异不为0，说明亚马逊报告中的总预留口径与原因明细口径存在差异，不代表系统计算错误。
+            </p>
+          </div>
+        </div>
+
+        <!-- 运营建议 -->
+        <div v-if="(currentDetail.operational_suggestion || []).length > 0" class="suggestion-box">
+          <div class="suggestion-title">
+            <el-icon><InfoFilled /></el-icon>
+            运营建议
+          </div>
+          <div
+            v-for="(suggestion, index) in currentDetail.operational_suggestion"
+            :key="index"
+            class="suggestion-item"
+          >
+            {{ suggestion }}
+          </div>
+        </div>
+
+        <!-- 全部原始字段 -->
+        <div class="raw-fields">
+          <el-divider content-position="left">全部原始字段</el-divider>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="SKU">{{ currentDetail.sku }}</el-descriptions-item>
+            <el-descriptions-item label="FNSKU">{{ currentDetail.fnsku }}</el-descriptions-item>
+            <el-descriptions-item label="ASIN">{{ currentDetail.asin }}</el-descriptions-item>
+            <el-descriptions-item label="商品名称">{{ currentDetail.product_name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="报告预留总数">{{ currentDetail.reserved_qty }}</el-descriptions-item>
+            <el-descriptions-item label="客户订单预留">{{ currentDetail.reserved_customerorders }}</el-descriptions-item>
+            <el-descriptions-item label="仓间调拨预留">{{ currentDetail.reserved_fc_transfers }}</el-descriptions-item>
+            <el-descriptions-item label="仓内处理预留">{{ currentDetail.reserved_fc_processing }}</el-descriptions-item>
+            <el-descriptions-item label="Program">{{ currentDetail.program || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
       </div>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="detailDialogVisible = false">关闭</el-button>
-        </span>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
       </template>
-    </el-dialog>
-
-    <!-- 库存预警对话框 -->
-    <el-dialog v-model="alertsDialogVisible" title="库存预警" width="800px">
-      <InventoryAlerts @close="alertsDialogVisible = false" />
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Upload,
+  Delete,
   Refresh,
   Download,
-  View,
   Box,
-  Goods,
-  Van,
-  Sell,
-  Grid,
-  Menu,
-  ArrowDown,
-  Location,
-  Clock
+  User,
+  Connection,
+  Clock,
+  QuestionFilled,
+  InfoFilled,
+  Warning
 } from '@element-plus/icons-vue'
 import { apiService } from '../../utils/api'
 import UploadDialog from '../../components/UploadDialog.vue'
-import InventoryAlerts from './components/InventoryAlerts.vue'
+import ReservedStatusHelp from '../../components/fba/ReservedStatusHelp.vue'
 
 // 数据状态
 const loading = ref(false)
 const inventoryList = ref([])
-const overviewData = ref({})
-
-// 视图模式
-const viewMode = ref('table')
+const statsData = ref({})
 
 // 筛选表单
-const filterForm = ref({
+const filterForm = reactive({
   sku: '',
   productName: '',
-  reservedType: '',
-  status: ''
+  asin: '',
+  reasonFilter: '',
+  dataStatusFilter: ''
 })
 
 // 分页配置
@@ -389,22 +555,15 @@ const pagination = ref({
   total: 0
 })
 
-// 排序配置
-const sortConfig = ref({
-  prop: 'latest_update_date',
-  order: 'descending'
-})
-
 // 对话框控制
 const uploadDialogVisible = ref(false)
 const detailDialogVisible = ref(false)
-const alertsDialogVisible = ref(false)
 const currentDetail = ref(null)
 
 // 初始化加载数据
 onMounted(() => {
   fetchInventoryList()
-  fetchOverviewData()
+  fetchStatsData()
 })
 
 // 获取库存列表
@@ -414,11 +573,10 @@ const fetchInventoryList = async () => {
     const params = {
       page: pagination.value.currentPage,
       pageSize: pagination.value.pageSize,
-      keyword: filterForm.value.sku || filterForm.value.productName,
-      type: filterForm.value.reservedType,
-      status: filterForm.value.status,
-      sortField: sortConfig.value.prop,
-      sortOrder: sortConfig.value.order === 'descending' ? 'desc' : 'asc'
+      search: filterForm.sku || filterForm.productName,
+      asinSearch: filterForm.asin,
+      reasonFilter: filterForm.reasonFilter,
+      dataStatusFilter: filterForm.dataStatusFilter
     }
 
     const data = await apiService.fba.reserved.getList(params)
@@ -432,19 +590,14 @@ const fetchInventoryList = async () => {
   }
 }
 
-// 获取概览数据
-const fetchOverviewData = async () => {
+// 获取统计数据
+const fetchStatsData = async () => {
   try {
     const data = await apiService.fba.reserved.getStats()
-    overviewData.value = data || {}
+    statsData.value = data || {}
   } catch (error) {
-    console.error('获取概览数据失败:', error)
-    overviewData.value = {
-      totalReserved: 0,
-      customerOrders: 0,
-      transferIn: 0,
-      transferOut: 0
-    }
+    console.error('获取统计数据失败:', error)
+    statsData.value = {}
   }
 }
 
@@ -456,12 +609,11 @@ const handleSearch = () => {
 
 // 重置筛选
 const resetFilter = () => {
-  filterForm.value = {
-    sku: '',
-    productName: '',
-    reservedType: '',
-    status: ''
-  }
+  filterForm.sku = ''
+  filterForm.productName = ''
+  filterForm.asin = ''
+  filterForm.reasonFilter = ''
+  filterForm.dataStatusFilter = ''
   pagination.value.currentPage = 1
   fetchInventoryList()
 }
@@ -478,23 +630,46 @@ const handleCurrentChange = (page) => {
   fetchInventoryList()
 }
 
-// 排序处理
-const handleSortChange = ({ prop, order }) => {
-  sortConfig.value = { prop, order }
-  fetchInventoryList()
-}
-
 // 刷新数据
 const refreshData = () => {
   fetchInventoryList()
-  fetchOverviewData()
+  fetchStatsData()
+}
+
+// 清空所有数据
+const handleClearAll = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要清空所有FBA预留库存数据吗？此操作不可恢复。',
+      '清空确认',
+      {
+        confirmButtonText: '确定清空',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    loading.value = true
+    await apiService.fba.reserved.deleteAll()
+    ElMessage.success('清空成功')
+    fetchInventoryList()
+    fetchStatsData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '清空失败')
+    }
+  } finally {
+    loading.value = false
+  }
 }
 
 // 导出数据
 const exportData = async () => {
   try {
     loading.value = true
-    ElMessage.info('导出功能开发中...')
+    ElMessage.info('正在导出数据...')
+    await apiService.fba.reserved.exportData('csv')
+    ElMessage.success('导出成功')
   } catch (error) {
     ElMessage.error(error.message || '导出失败')
   } finally {
@@ -502,46 +677,21 @@ const exportData = async () => {
   }
 }
 
-// 查看预警
-const viewAlerts = () => {
-  alertsDialogVisible.value = true
-}
-
 // 上传成功后刷新数据
 const handleUploadSuccess = () => {
   fetchInventoryList()
-  fetchOverviewData()
+  fetchStatsData()
 }
 
 // 查看详情
-const viewDetails = (row) => {
-  currentDetail.value = row
-  detailDialogVisible.value = true
-}
-
-const handleMoreCommand = (row, command) => {
-  switch (command) {
-    case 'history':
-      ElMessage.info('历史记录功能开发中')
-      break
-    case 'export':
-      exportItem(row)
-      break
+const viewDetails = async (row) => {
+  try {
+    const data = await apiService.fba.reserved.getDetail(row.sku)
+    currentDetail.value = data
+    detailDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error(error.message || '获取详情失败')
   }
-}
-
-const exportItem = (row) => {
-  const data = JSON.stringify(row, null, 2)
-  const blob = new Blob([data], { type: 'application/json' })
-  const url = window.URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `FBA预留_${row.sku}_${new Date().toISOString().split('T')[0]}.json`
-  document.body.appendChild(a)
-  a.click()
-  window.URL.revokeObjectURL(url)
-  document.body.removeChild(a)
-  ElMessage.success('导出成功')
 }
 
 // 工具方法
@@ -549,52 +699,23 @@ const formatNumber = (num) => {
   return num?.toLocaleString() || '0'
 }
 
-const formatDateTime = (dateString) => {
-  if (!dateString) return '-'
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-const getReservedTypeTag = (type) => {
+const getTagType = (type) => {
   const map = {
-    'customer_orders': 'primary',
-    'transfer_in': 'success',
-    'transfer_out': 'warning'
+    'blue': '',
+    'cyan': 'success',
+    'orange': 'warning',
+    'purple': 'purple',
+    'warning': 'warning',
+    'danger': 'danger',
+    'info': 'info',
+    'gray': 'info'
   }
   return map[type] || 'info'
 }
 
-const getReservedTypeText = (type) => {
-  const map = {
-    'customer_orders': '客户订单预留',
-    'transfer_in': '入库中转预留',
-    'transfer_out': '出库中转预留'
-  }
-  return map[type] || type || '-'
-}
-
-const getStatusTag = (status) => {
-  const map = {
-    'active': 'success',
-    'pending': 'warning',
-    'released': 'info'
-  }
-  return map[status] || ''
-}
-
-const getStatusText = (status) => {
-  const map = {
-    'active': '有效',
-    'pending': '待释放',
-    'released': '已释放'
-  }
-  return map[status] || status || '-'
+// 列表展示用的标签（过滤掉报告口径差异，它只在详情展示）
+const getDisplayTags = (tags) => {
+  return tags.filter(tag => tag.label !== '报告口径差异')
 }
 
 const showUploadDialog = () => {
@@ -638,11 +759,11 @@ const showUploadDialog = () => {
   background: linear-gradient(135deg, #67C23A, #95D475);
 }
 
-.overview-card.transfer-in .overview-icon {
+.overview-card.fc-transfers .overview-icon {
   background: linear-gradient(135deg, #E6A23C, #F3D19E);
 }
 
-.overview-card.transfer-out .overview-icon {
+.overview-card.fc-processing .overview-icon {
   background: linear-gradient(135deg, #F56C6C, #F89898);
 }
 
@@ -679,18 +800,16 @@ const showUploadDialog = () => {
 .overview-label {
   font-size: 14px;
   color: #909399;
-  margin-bottom: 4px;
-}
-
-.overview-change {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  margin-bottom: 2px;
 }
 
 .overview-hint {
+  font-size: 12px;
   color: #C0C4CC;
+}
+
+.data-warning {
+  margin-top: 12px;
 }
 
 .filter-card {
@@ -717,139 +836,271 @@ const showUploadDialog = () => {
   font-size: 14px;
 }
 
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.card-view {
-  margin-top: 20px;
-}
-
-.inventory-card {
-  margin-bottom: 20px;
-  transition: all 0.3s;
-}
-
-.inventory-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.sku {
-  font-weight: bold;
-  color: #303133;
-}
-
-.card-content {
-  padding: 4px 0;
-}
-
-.product-name {
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 12px;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-.inventory-stats {
-  margin-bottom: 12px;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  font-size: 12px;
-}
-
-.stat-label {
-  color: #909399;
-}
-
-.stat-value {
-  color: #303133;
-  font-weight: 500;
-}
-
-.additional-info {
-  border-top: 1px solid #EBEEF5;
-  padding-top: 12px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: #606266;
-}
-
-.info-item .el-icon {
-  margin-right: 6px;
-  font-size: 14px;
-}
-
-.card-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
-
 .pagination-container {
   padding: 20px 0;
   text-align: right;
 }
 
+.header-help-icon {
+  margin-left: 4px;
+  color: #909399;
+  cursor: pointer;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.header-help-icon:hover {
+  color: #409EFF;
+}
+
+.mr-2 {
+  margin-right: 4px;
+}
+
+.mb-2 {
+  margin-bottom: 4px;
+}
+
+.reserved-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 200px;
+}
+
+.reserved-tag {
+  flex-shrink: 0;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-danger {
+  color: #F56C6C;
+  font-weight: bold;
+}
+
+.field-help {
+  padding: 4px 0;
+  max-width: 320px;
+}
+
+.field-help-title {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.field-help-content p {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.5;
+}
+
+/* 详情弹窗样式 */
 .detail-container {
   line-height: 1.6;
 }
 
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
+.detail-summary {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
 
-  .header-actions {
-    width: 100%;
-    flex-wrap: wrap;
-  }
+.summary-header {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+}
 
-  .overview-item {
-    flex-direction: column;
-    text-align: center;
-    padding: 12px;
-  }
+.summary-item {
+  font-size: 14px;
+}
 
-  .overview-icon {
-    margin-right: 0;
-    margin-bottom: 12px;
-  }
+.summary-item .label {
+  color: #909399;
+}
 
-  .table-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
+.summary-item .value {
+  font-weight: bold;
+  color: #303133;
+  margin-left: 4px;
+}
 
-  .toolbar-right {
-    width: 100%;
-    justify-content: flex-start;
-  }
+.summary-product {
+  margin-bottom: 12px;
+}
+
+.product-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.summary-tags-label {
+  font-weight: 600;
+  color: #606266;
+  font-size: 14px;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 24px;
+  padding: 12px 0;
+  border-top: 1px solid #dcdfe6;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-item .stat-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+.stat-item .stat-value {
+  font-size: 18px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.stat-item .stat-value.text-danger {
+  color: #F56C6C;
+}
+
+.reason-breakdown {
+  margin-bottom: 20px;
+}
+
+.breakdown-title {
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+}
+
+.breakdown-card {
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.breakdown-card.customer-orders {
+  background: #ecf5ff;
+}
+
+.breakdown-card.fc-transfers {
+  background: #f0f9eb;
+}
+
+.breakdown-card.fc-processing {
+  background: #fdf6ec;
+}
+
+.breakdown-card.recoverable {
+  background: #f4f4f5;
+}
+
+.breakdown-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.breakdown-label {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.breakdown-ratio {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.suggestion-box {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #f4f4f5;
+  border-radius: 6px;
+  border-left: 4px solid #909399;
+}
+
+.suggestion-title {
+  display: flex;
+  align-items: center;
+}
+
+.data-validation-section {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: #fef0f0;
+  border-radius: 6px;
+  border-left: 4px solid #f56c6c;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 12px;
+}
+
+.validation-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+.validation-note p {
+  margin: 4px 0;
+}
+
+.validation-note .warning-text {
+  color: #f56c6c;
+  font-weight: 500;
+}
+
+.suggestion-item {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.suggestion-item:last-child {
+  margin-bottom: 0;
+}
+
+.raw-fields {
+  margin-top: 16px;
+}
+
+:deep(.el-progress) {
+  margin-top: 8px;
+}
+
+:deep(.el-divider) {
+  margin: 16px 0;
 }
 </style>

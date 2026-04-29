@@ -9,24 +9,24 @@
           <el-breadcrumb-item>业务报告</el-breadcrumb-item>
         </el-breadcrumb>
       </div>
-      
+
       <div class="header-right">
-        <el-button 
-          type="primary" 
-          :icon="Upload" 
+        <el-button
+          type="primary"
+          :icon="Upload"
           @click="showUploadDialog = true"
         >
           上传报告
         </el-button>
-        <el-button 
-          :icon="Download" 
+        <el-button
+          :icon="Download"
           @click="handleExport"
           :loading="exportLoading"
         >
           导出数据
         </el-button>
-        <el-button 
-          :icon="Refresh" 
+        <el-button
+          :icon="Refresh"
           @click="refreshData"
           :loading="loading"
         >
@@ -50,7 +50,7 @@
             @change="handleDateChange"
           />
         </div>
-        
+
         <div class="filter-item">
           <span class="filter-label">快速选择：</span>
           <el-radio-group v-model="quickRange" @change="handleQuickRangeChange">
@@ -69,23 +69,17 @@
           <el-card shadow="hover" class="summary-card">
             <div class="card-content">
               <div class="card-icon" style="background: #409eff20;">
-                <el-icon color="#409eff"><Money /></el-icon>
+                <el-icon color="#409eff"><User /></el-icon>
               </div>
               <div class="card-info">
-                <div class="card-title">总销售额</div>
-                <div class="card-value">¥ {{ formatCurrency(summary.total_sales || 0) }}</div>
-                <div class="card-trend">
-                  <el-icon v-if="salesTrend > 0" color="#f56c6c"><Top /></el-icon>
-                  <el-icon v-else color="#67c23a"><Bottom /></el-icon>
-                  <span :class="salesTrend > 0 ? 'trend-up' : 'trend-down'">
-                    {{ Math.abs(salesTrend) }}%
-                  </span>
-                </div>
+                <div class="card-title">总会话数</div>
+                <div class="card-value">{{ formatNumber(summary.total_sessions || 0) }}</div>
+                <div class="card-subtitle">页面浏览量: {{ formatNumber(summary.total_page_views || 0) }}</div>
               </div>
             </div>
           </el-card>
         </el-col>
-        
+
         <el-col :span="6">
           <el-card shadow="hover" class="summary-card">
             <div class="card-content">
@@ -93,38 +87,38 @@
                 <el-icon color="#67c23a"><Document /></el-icon>
               </div>
               <div class="card-info">
-                <div class="card-title">总订单数</div>
-                <div class="card-value">{{ formatNumber(summary.total_orders || 0) }}</div>
-                <div class="card-subtitle">平均订单价值: ¥ {{ formatCurrency(summary.avg_sales_per_order || 0) }}</div>
+                <div class="card-title">总销售数量</div>
+                <div class="card-value">{{ formatNumber(summary.total_units || 0) }}</div>
+                <div class="card-subtitle">平均单件售价: ¥ {{ formatCurrency(summary.avg_unit_price || 0) }}</div>
               </div>
             </div>
           </el-card>
         </el-col>
-        
+
         <el-col :span="6">
           <el-card shadow="hover" class="summary-card">
             <div class="card-content">
               <div class="card-icon" style="background: #e6a23c20;">
-                <el-icon color="#e6a23c"><Box /></el-icon>
+                <el-icon color="#e6a23c"><Grid /></el-icon>
               </div>
               <div class="card-info">
-                <div class="card-title">总销售数量</div>
-                <div class="card-value">{{ formatNumber(summary.total_units || 0) }}</div>
-                <div class="card-subtitle">转化率: {{ formatNumber((summary.avg_conversion_rate || 0), 2) }}%</div>
+                <div class="card-title">订单商品数量转化率</div>
+                <div class="card-value">{{ formatNumber((summary.avg_conversion_rate || 0), 2) }}%</div>
+                <div class="card-subtitle">SKU数: {{ formatNumber(summary.total_skus || 0) }}</div>
               </div>
             </div>
           </el-card>
         </el-col>
-        
+
         <el-col :span="6">
           <el-card shadow="hover" class="summary-card">
             <div class="card-content">
               <div class="card-icon" style="background: #f56c6c20;">
-                <el-icon color="#f56c6c"><Flag /></el-icon>
+                <el-icon color="#f56c6c"><Money /></el-icon>
               </div>
               <div class="card-info">
-                <div class="card-title">报告总数</div>
-                <div class="card-value">{{ formatNumber(summary.total_reports || 0) }}</div>
+                <div class="card-title">总销售额</div>
+                <div class="card-value">¥ {{ formatCurrency(summary.total_sales || 0) }}</div>
                 <div class="card-subtitle">
                   {{ formatDate(summary.first_report_date) }} 至 {{ formatDate(summary.last_report_date) }}
                 </div>
@@ -142,7 +136,7 @@
           <el-card shadow="never" class="chart-card">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">销售额趋势</span>
+                <span class="chart-title">会话数趋势</span>
                 <div class="chart-actions">
                   <el-button-group>
                     <el-button size="small" :type="salesChartType === 'line' ? 'primary' : ''" @click="salesChartType = 'line'">折线图</el-button>
@@ -154,12 +148,12 @@
             <div ref="salesChartRef" class="chart-container"></div>
           </el-card>
         </el-col>
-        
+
         <el-col :span="12">
           <el-card shadow="never" class="chart-card">
             <template #header>
               <div class="chart-header">
-                <span class="chart-title">站点销售额分布</span>
+                <span class="chart-title">SKU销售分布</span>
               </div>
             </template>
             <div ref="siteChartRef" class="chart-container"></div>
@@ -177,7 +171,7 @@
             <div class="table-actions">
               <el-input
                 v-model="searchKeyword"
-                placeholder="搜索报告ID或站点"
+                placeholder="搜索SKU、ASIN或标题"
                 :prefix-icon="Search"
                 style="width: 200px; margin-right: 10px;"
                 @input="handleSearch"
@@ -187,7 +181,7 @@
             </div>
           </div>
         </template>
-        
+
         <el-table
           ref="reportTableRef"
           v-loading="tableLoading"
@@ -197,39 +191,181 @@
           :default-sort="{ prop: 'report_date', order: 'descending' }"
         >
           <el-table-column type="selection" width="50" />
-          <el-table-column prop="report_id" label="报告ID" width="180" />
-          <el-table-column prop="site" label="站点" width="120">
+
+          <!-- 核心运营字段 -->
+          <el-table-column prop="parent_asin" label="父ASIN" width="130" show-overflow-tooltip />
+          <el-table-column prop="child_asin" label="子ASIN" width="130" show-overflow-tooltip />
+          <el-table-column prop="sku" label="SKU" width="120" show-overflow-tooltip />
+          <el-table-column prop="title" label="标题" width="180" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-tag size="small">{{ row.site }}</el-tag>
+              <span class="title-cell" :title="row.title">{{ row.title || '-' }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="report_date" label="报告日期" width="120" sortable>
+
+          <!-- 核心指标 - 运营必看 -->
+          <el-table-column prop="sessions" label="会话数" width="110" sortable align="right">
             <template #default="{ row }">
-              {{ formatDate(row.report_date) }}
+              <span class="numeric-cell">{{ formatNumber(row.sessions) }}</span>
+            </template>
+            <template #header>
+              <span class="column-header-with-help">
+                会话数
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="getFieldHelpContent('sessions')"
+                  raw-content
+                >
+                  <template #reference>
+                    <el-icon class="field-help-icon" color="#909399"><QuestionFilled /></el-icon>
+                  </template>
+                </el-popover>
+              </span>
             </template>
           </el-table-column>
-          <el-table-column prop="total_sales" label="销售额" width="120" sortable>
+          <el-table-column prop="page_views" label="页面浏览量" width="120" sortable align="right">
             <template #default="{ row }">
-              <span class="currency-value">¥ {{ formatCurrency(row.total_sales) }}</span>
+              <span class="numeric-cell">{{ formatNumber(row.page_views) }}</span>
+            </template>
+            <template #header>
+              <span class="column-header-with-help">
+                页面浏览量
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="getFieldHelpContent('page_views')"
+                  raw-content
+                >
+                  <template #reference>
+                    <el-icon class="field-help-icon" color="#909399"><QuestionFilled /></el-icon>
+                  </template>
+                </el-popover>
+              </span>
             </template>
           </el-table-column>
-          <el-table-column prop="total_orders" label="订单数" width="100" sortable />
-          <el-table-column prop="total_units" label="销售数量" width="100" sortable />
-          <el-table-column prop="average_sales_per_order" label="平均订单价值" width="130" sortable>
+          <el-table-column prop="page_views_percentage" label="页面浏览量占比" width="130" sortable align="right">
             <template #default="{ row }">
-              ¥ {{ formatCurrency(row.average_sales_per_order) }}
+              <span class="percentage-cell">{{ formatNumber(row.page_views_percentage, 2) }}%</span>
+            </template>
+            <template #header>
+              <span class="column-header-with-help">
+                页面浏览量占比
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="getFieldHelpContent('page_views_percentage')"
+                  raw-content
+                >
+                  <template #reference>
+                    <el-icon class="field-help-icon" color="#909399"><QuestionFilled /></el-icon>
+                  </template>
+                </el-popover>
+              </span>
             </template>
           </el-table-column>
-          <el-table-column prop="conversion_rate" label="转化率" width="100" sortable>
+          <el-table-column prop="product_session_percentage" label="订单商品数量转化率" width="150" sortable align="right">
             <template #default="{ row }">
-              {{ formatNumber(row.conversion_rate, 2) }}%
+              <span class="highlight-cell">{{ formatNumber(row.product_session_percentage, 2) }}%</span>
+            </template>
+            <template #header>
+              <span class="column-header-with-help">
+                订单商品数量转化率
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="getFieldHelpContent('product_session_percentage')"
+                  raw-content
+                >
+                  <template #reference>
+                    <el-icon class="field-help-icon" color="#909399"><QuestionFilled /></el-icon>
+                  </template>
+                </el-popover>
+              </span>
             </template>
           </el-table-column>
-          <el-table-column prop="created_at" label="上传时间" width="160" sortable>
+          <el-table-column prop="avg_unit_price" label="平均单件售价" width="130" sortable align="right">
             <template #default="{ row }">
-              {{ formatDateTime(row.created_at) }}
+              <span class="currency-value">¥ {{ formatCurrency(row.avg_unit_price || 0) }}</span>
+            </template>
+            <template #header>
+              <span class="column-header-with-help">
+                平均单件售价
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="getFieldHelpContent('avg_unit_price')"
+                  raw-content
+                >
+                  <template #reference>
+                    <el-icon class="field-help-icon" color="#909399"><QuestionFilled /></el-icon>
+                  </template>
+                </el-popover>
+              </span>
             </template>
           </el-table-column>
+
+          <!-- 次要指标 - 销售相关 -->
+          <el-table-column prop="ordered_quantity" label="已订购商品数量" width="130" sortable align="right">
+            <template #default="{ row }">
+              <span class="numeric-cell">{{ formatNumber(row.ordered_quantity) }}</span>
+            </template>
+            <template #header>
+              <span class="column-header-with-help">
+                已订购商品数量
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="getFieldHelpContent('ordered_quantity')"
+                  raw-content
+                >
+                  <template #reference>
+                    <el-icon class="field-help-icon" color="#909399"><QuestionFilled /></el-icon>
+                  </template>
+                </el-popover>
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="sales_amount" label="已订购商品销售额" width="140" sortable align="right">
+            <template #default="{ row }">
+              <span class="currency-value">¥ {{ formatCurrency(row.sales_amount || 0) }}</span>
+            </template>
+            <template #header>
+              <span class="column-header-with-help">
+                已订购商品销售额
+                <el-popover
+                  placement="top"
+                  :width="300"
+                  trigger="hover"
+                  :content="getFieldHelpContent('sales_amount')"
+                  raw-content
+                >
+                  <template #reference>
+                    <el-icon class="field-help-icon" color="#909399"><QuestionFilled /></el-icon>
+                  </template>
+                </el-popover>
+              </span>
+            </template>
+          </el-table-column>
+
+          <!-- 表现标签 -->
+          <el-table-column label="表现标签" width="120" align="center">
+            <template #default="{ row }">
+              <el-tag
+                :type="getPerformanceTagType(row.performance_tag)"
+                size="small"
+              >
+                {{ row.performance_tag || '常规' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+
+          <!-- 操作 -->
           <el-table-column label="操作" width="120" fixed="right">
             <template #default="{ row }">
               <el-button size="small" :icon="View" @click="handleViewDetail(row)">详情</el-button>
@@ -237,7 +373,7 @@
             </template>
           </el-table-column>
         </el-table>
-        
+
         <div class="pagination-container">
           <el-pagination
             v-model:current-page="currentPage"
@@ -266,25 +402,63 @@
     <!-- 详情对话框 -->
     <el-dialog
       v-model="showDetailDialog"
-      :title="`业务报告详情 - ${selectedReport?.report_id || ''}`"
-      width="800px"
+      :title="`业务报告详情 - ${selectedReport?.sku || ''}`"
+      width="900px"
     >
       <div v-if="selectedReport" class="detail-dialog-content">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="报告ID">{{ selectedReport.report_id }}</el-descriptions-item>
-          <el-descriptions-item label="站点">{{ selectedReport.site }}</el-descriptions-item>
-          <el-descriptions-item label="报告日期">{{ formatDate(selectedReport.report_date) }}</el-descriptions-item>
-          <el-descriptions-item label="销售额">¥ {{ formatCurrency(selectedReport.total_sales) }}</el-descriptions-item>
-          <el-descriptions-item label="订单数">{{ selectedReport.total_orders }}</el-descriptions-item>
-          <el-descriptions-item label="销售数量">{{ selectedReport.total_units }}</el-descriptions-item>
-          <el-descriptions-item label="平均订单价值">¥ {{ formatCurrency(selectedReport.average_sales_per_order) }}</el-descriptions-item>
-          <el-descriptions-item label="转化率">{{ formatNumber(selectedReport.conversion_rate, 2) }}%</el-descriptions-item>
-          <el-descriptions-item label="页面浏览量">{{ selectedReport.page_views }}</el-descriptions-item>
-          <el-descriptions-item label="访客数">{{ selectedReport.visitors }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ formatDateTime(selectedReport.created_at) }}</el-descriptions-item>
-          <el-descriptions-item label="更新时间">{{ formatDateTime(selectedReport.updated_at) }}</el-descriptions-item>
-        </el-descriptions>
-        
+        <!-- 核心指标 -->
+        <div class="detail-section">
+          <h4 class="detail-section-title">核心指标</h4>
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="SKU">{{ selectedReport.sku }}</el-descriptions-item>
+            <el-descriptions-item label="会话数">{{ formatNumber(selectedReport.sessions) }}</el-descriptions-item>
+            <el-descriptions-item label="页面浏览量">{{ formatNumber(selectedReport.page_views) }}</el-descriptions-item>
+            <el-descriptions-item label="页面浏览量占比">{{ formatNumber(selectedReport.page_views_percentage, 2) }}%</el-descriptions-item>
+            <el-descriptions-item label="订单商品数量转化率">
+              <span class="highlight-cell">{{ formatNumber(selectedReport.product_session_percentage, 2) }}%</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="平均单件售价">¥ {{ formatCurrency(selectedReport.avg_unit_price || 0) }}</el-descriptions-item>
+            <el-descriptions-item label="已订购商品数量">{{ formatNumber(selectedReport.ordered_quantity) }}</el-descriptions-item>
+            <el-descriptions-item label="已订购商品销售额">¥ {{ formatCurrency(selectedReport.sales_amount || 0) }}</el-descriptions-item>
+            <el-descriptions-item label="报告日期">{{ formatDate(selectedReport.report_date) }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- ASIN信息 -->
+        <div class="detail-section">
+          <h4 class="detail-section-title">ASIN 信息</h4>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="父ASIN">{{ selectedReport.parent_asin || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="子ASIN">{{ selectedReport.child_asin || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="标题" :span="2">{{ selectedReport.title || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- B2B 指标 -->
+        <div class="detail-section">
+          <h4 class="detail-section-title">B2B 指标</h4>
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="B2B 会话数">{{ formatNumber(selectedReport.sessions_b2b || 0) }}</el-descriptions-item>
+            <el-descriptions-item label="B2B 页面浏览量">{{ formatNumber(selectedReport.page_views_b2b || 0) }}</el-descriptions-item>
+            <el-descriptions-item label="B2B 页面浏览量百分比">{{ formatNumber(selectedReport.page_views_percentage_b2b || 0, 2) }}%</el-descriptions-item>
+            <el-descriptions-item label="推荐报价百分比">{{ formatNumber(selectedReport.recommended_offer_percentage || 0, 2) }}%</el-descriptions-item>
+            <el-descriptions-item label="推荐报价百分比 - B2B">{{ formatNumber(selectedReport.recommended_offer_percentage_b2b || 0, 2) }}%</el-descriptions-item>
+            <el-descriptions-item label="商品会话百分比 - B2B">{{ formatNumber(selectedReport.product_session_percentage_b2b || 0, 2) }}%</el-descriptions-item>
+            <el-descriptions-item label="已订购商品数量 - B2B">{{ formatNumber(selectedReport.ordered_quantity_b2b || 0) }}</el-descriptions-item>
+            <el-descriptions-item label="已订购商品销售额 - B2B">¥ {{ formatCurrency(selectedReport.sales_amount_b2b || 0) }}</el-descriptions-item>
+            <el-descriptions-item label="订单商品总数 - B2B">{{ formatNumber(selectedReport.total_order_items_b2b || 0) }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- 辅助信息 -->
+        <div class="detail-section">
+          <h4 class="detail-section-title">辅助信息</h4>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="订单商品总数">{{ formatNumber(selectedReport.total_order_items || 0) }}</el-descriptions-item>
+            <el-descriptions-item label="上传时间">{{ formatDateTime(selectedReport.created_at) }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+
         <div class="detail-actions">
           <el-button @click="showDetailDialog = false">关闭</el-button>
           <el-button type="primary" @click="handleExportSingle(selectedReport)">导出此报告</el-button>
@@ -298,12 +472,13 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
-import { 
+import {
   Upload, Download, Refresh, Search, View, Delete,
-  Money, Document, Box, Flag, Top, Bottom, Loading
+  Money, Document, Grid, User, Flag, Loading, QuestionFilled
 } from '@element-plus/icons-vue'
 import { apiService } from '@/utils/api.js'
 import UploadDialog from '@/components/UploadDialog.vue'
+import { businessReportFieldHelp } from '@/config/businessReportFieldHelp.js'
 
 // 数据状态
 const loading = ref(false)
@@ -321,7 +496,6 @@ const totalCount = ref(0)
 
 // 对话框状态
 const showUploadDialog = ref(false)
-
 const showDetailDialog = ref(false)
 const selectedReport = ref(null)
 
@@ -340,12 +514,16 @@ const siteChartRef = ref(null)
 let salesChart = null
 let siteChart = null
 
+// 用于计算表现标签的均值
+const globalAvgSessions = ref(0)
+const globalAvgConversion = ref(0)
+
 // 初始化日期范围
 const initDateRange = () => {
   const endDate = new Date()
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - 30)
-  
+
   dateRange.value = [
     startDate.toISOString().split('T')[0],
     endDate.toISOString().split('T')[0]
@@ -354,16 +532,16 @@ const initDateRange = () => {
 
 // 格式化函数
 const formatCurrency = (value) => {
-  return Number(value).toLocaleString('zh-CN', {
+  return Number(value || 0).toLocaleString('zh-CN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })
 }
 
 const formatNumber = (value, decimals = 0) => {
-  const num = Number(value);
+  const num = Number(value || 0);
   if (isNaN(num)) return decimals > 0 ? '0.'.padEnd(decimals + 2, '0') : '0';
-  
+
   if (decimals > 0) {
     return num.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
@@ -380,15 +558,95 @@ const formatDateTime = (dateTimeStr) => {
   return new Date(dateTimeStr).toLocaleString('zh-CN')
 }
 
-// 计算销售趋势（示例）
-const salesTrend = computed(() => {
-  // 这里可以计算实际趋势，暂时返回固定值
-  return 12.5
-})
+/**
+ * 计算表现标签
+ * @param {Object} row 数据行
+ * @returns {string} 表现标签
+ */
+const calculatePerformanceTag = (row) => {
+  const sessions = row.sessions || 0;
+  const conversion = row.product_session_percentage || 0;
+  const orderedQty = row.ordered_quantity || 0;
+
+  // 高流量低转化：会话数高于整体均值 且 转化率低于整体均值
+  if (sessions > globalAvgSessions.value && conversion < globalAvgConversion.value) {
+    return '高流量低转化';
+  }
+
+  // 低流量高转化：会话数低于整体均值 且 转化率高于整体均值
+  if (sessions < globalAvgSessions.value && conversion > globalAvgConversion.value) {
+    return '低流量高转化';
+  }
+
+  // 高流量无订单：会话数较高 但 已订购商品数量 = 0
+  if (sessions > globalAvgSessions.value && orderedQty === 0) {
+    return '高流量无订单';
+  }
+
+  // 高转化高销量：转化率高 且 已订购商品数量高
+  if (conversion > globalAvgConversion.value && orderedQty > (summary.value.total_units / Math.max(summary.value.total_skus, 1))) {
+    return '高转化高销量';
+  }
+
+  return '常规';
+}
+
+/**
+ * 获取表现标签的颜色类型
+ */
+const getPerformanceTagType = (tag) => {
+  switch (tag) {
+    case '高流量低转化': return 'warning';
+    case '低流量高转化': return 'success';
+    case '高流量无订单': return 'danger';
+    case '高转化高销量': return 'primary';
+    default: return 'info';
+  }
+}
+
+/**
+ * 获取字段说明的 Popover 显示内容
+ */
+const getFieldHelpContent = (fieldKey) => {
+  const help = businessReportFieldHelp[fieldKey]
+  if (!help) return ''
+  return `<div class="field-help-content">
+    <div class="field-help-item"><span class="field-help-label">原始字段：</span><span class="field-help-value">${help.originalField}</span></div>
+    <div class="field-help-item"><span class="field-help-label">含义：</span><span class="field-help-value">${help.meaning}</span></div>
+    <div class="field-help-item"><span class="field-help-label">运营用途：</span><span class="field-help-value">${help.usage}</span></div>
+  </div>`
+}
+
+/**
+ * 生成表头标签（文字 + 问号）
+ */
+const getColumnLabel = (text, fieldKey) => {
+  return text
+}
+
+/**
+ * 为每条记录计算表现标签
+ */
+const enrichReportListWithTags = (list) => {
+  if (!list || list.length === 0) return list;
+
+  // 计算全局均值
+  const totalSessions = list.reduce((sum, item) => sum + (item.sessions || 0), 0);
+  const totalConversion = list.reduce((sum, item) => sum + (item.product_session_percentage || 0), 0);
+  globalAvgSessions.value = list.length > 0 ? totalSessions / list.length : 0;
+  globalAvgConversion.value = list.length > 0 ? totalConversion / list.length : 0;
+
+  // 为每条记录添加表现标签
+  return list.map(item => ({
+    ...item,
+    performance_tag: calculatePerformanceTag(item)
+  }));
+}
 
 // 加载数据
 const loadBusinessData = async () => {
   loading.value = true
+  tableLoading.value = true
   try {
     const [summaryRes, reportsRes] = await Promise.all([
       apiService.business.getSummary({
@@ -402,13 +660,15 @@ const loadBusinessData = async () => {
         pageSize: pageSize.value
       })
     ])
-    
+
     summary.value = summaryRes.summary || {}
     salesBySite.value = summaryRes.salesBySite || []
     salesTrendData.value = summaryRes.salesTrend || []
-    reportList.value = reportsRes.reports || []
+
+    // 为报告列表添加表现标签
+    reportList.value = enrichReportListWithTags(reportsRes.reports || [])
     totalCount.value = reportsRes.pagination?.total || 0
-    
+
     // 渲染图表
     nextTick(() => {
       renderSalesChart()
@@ -423,20 +683,20 @@ const loadBusinessData = async () => {
   }
 }
 
-// 渲染销售额趋势图表
+// 渲染会话数趋势图表
 const renderSalesChart = () => {
   if (!salesChartRef.value) return
-  
+
   if (salesChart) {
     salesChart.dispose()
   }
-  
+
   salesChart = echarts.init(salesChartRef.value)
-  
+
   const dates = salesTrendData.value.map(item => item.date)
-  const salesData = salesTrendData.value.map(item => item.daily_sales)
-  const ordersData = salesTrendData.value.map(item => item.daily_orders)
-  
+  const sessionsData = salesTrendData.value.map(item => item.daily_sessions || item.daily_orders)
+  const pageViewsData = salesTrendData.value.map(item => item.total_page_views)
+
   const option = {
     tooltip: {
       trigger: 'axis',
@@ -445,7 +705,7 @@ const renderSalesChart = () => {
       }
     },
     legend: {
-      data: ['销售额', '订单数']
+      data: ['会话数', '页面浏览量']
     },
     grid: {
       left: '3%',
@@ -458,27 +718,27 @@ const renderSalesChart = () => {
       data: dates,
       axisLabel: {
         formatter: (value) => {
-          return value.split('-').slice(1).join('-') // 显示月-日
+          return value.split('-').slice(1).join('-')
         }
       }
     },
     yAxis: [
       {
         type: 'value',
-        name: '销售额(¥)',
+        name: '会话数',
         position: 'left'
       },
       {
         type: 'value',
-        name: '订单数',
+        name: '页面浏览量',
         position: 'right'
       }
     ],
     series: [
       {
-        name: '销售额',
+        name: '会话数',
         type: salesChartType.value,
-        data: salesData,
+        data: sessionsData,
         yAxisIndex: 0,
         itemStyle: {
           color: '#409eff'
@@ -486,9 +746,9 @@ const renderSalesChart = () => {
         smooth: true
       },
       {
-        name: '订单数',
+        name: '页面浏览量',
         type: salesChartType.value === 'line' ? 'line' : 'bar',
-        data: ordersData,
+        data: pageViewsData,
         yAxisIndex: 1,
         itemStyle: {
           color: '#67c23a'
@@ -497,31 +757,32 @@ const renderSalesChart = () => {
       }
     ]
   }
-  
+
   salesChart.setOption(option)
 }
 
-// 渲染站点分布图表
+// 渲染SKU分布图表
 const renderSiteChart = () => {
   if (!siteChartRef.value) return
-  
+
   if (siteChart) {
     siteChart.dispose()
   }
-  
+
   siteChart = echarts.init(siteChartRef.value)
-  
+
   const siteData = salesBySite.value
     .map(item => ({
       name: item.site,
-      value: item.total_sales
+      value: item.total_sessions || item.total_page_views || 0
     }))
     .sort((a, b) => b.value - a.value)
-  
+    .slice(0, 10)
+
   const option = {
     tooltip: {
       trigger: 'item',
-      formatter: '{a} <br/>{b}: ¥{c} ({d}%)'
+      formatter: '{a} <br/>{b}: {c} ({d}%)'
     },
     legend: {
       type: 'scroll',
@@ -533,7 +794,7 @@ const renderSiteChart = () => {
     },
     series: [
       {
-        name: '站点销售额',
+        name: 'SKU分布',
         type: 'pie',
         radius: ['40%', '70%'],
         center: ['40%', '50%'],
@@ -561,7 +822,7 @@ const renderSiteChart = () => {
       }
     ]
   }
-  
+
   siteChart.setOption(option)
 }
 
@@ -575,12 +836,12 @@ const handleQuickRangeChange = (days) => {
   const endDate = new Date()
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - parseInt(days))
-  
+
   dateRange.value = [
     startDate.toISOString().split('T')[0],
     endDate.toISOString().split('T')[0]
   ]
-  
+
   currentPage.value = 1
   loadBusinessData()
 }
@@ -601,37 +862,6 @@ const handleCurrentChange = (newPage) => {
   loadBusinessData()
 }
 
-// 表格行样式函数
-const tableRowClassName = ({ rowIndex }) => {
-  return rowIndex % 2 === 0 ? 'even-row' : 'odd-row'
-}
-
-
-
-// 解析CSV单行（简单实现，支持去除引号）
-const parseCSVLine = (line) => {
-  // 简单逗号分割，去除首尾空格和引号
-  return line.split(',').map(cell => {
-    let trimmed = cell.trim()
-    // 定义引号字符集合（包括英文和中文引号）
-    const quoteChars = ['"', "'", '“', '”', '‘', '’']
-    // 循环去除开头和结尾的引号（可能有多层）
-    let changed
-    do {
-      changed = false
-      if (trimmed.length === 0) break
-      const firstChar = trimmed[0]
-      const lastChar = trimmed[trimmed.length - 1]
-      if (quoteChars.includes(firstChar) && quoteChars.includes(lastChar)) {
-        trimmed = trimmed.substring(1, trimmed.length - 1)
-        changed = true
-      }
-    } while (changed)
-    return trimmed
-  })
-}
-
-
 const handleExport = async () => {
   exportLoading.value = true
   try {
@@ -640,10 +870,9 @@ const handleExport = async () => {
       endDate: dateRange.value[1],
       format: 'csv'
     }
-    
+
     const blob = await apiService.business.exportReports(params)
-    
-    // 创建下载链接
+
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -652,7 +881,7 @@ const handleExport = async () => {
     a.click()
     document.body.removeChild(a)
     window.URL.revokeObjectURL(url)
-    
+
     ElMessage.success('导出成功')
   } catch (error) {
     ElMessage.error('导出失败: ' + error.message)
@@ -701,7 +930,7 @@ const handleBatchDelete = () => {
 
 const handleDelete = (report) => {
   ElMessageBox.confirm(
-    `确定要删除报告 "${report.report_id}" 吗？此操作不可恢复。`,
+    `确定要删除报告 "${report.sku}" 吗？此操作不可恢复。`,
     '删除确认',
     {
       confirmButtonText: '确定',
@@ -752,7 +981,6 @@ onBeforeUnmount(() => {
   min-height: calc(100vh - 120px);
 }
 
-/* 页面标题 */
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -772,7 +1000,6 @@ onBeforeUnmount(() => {
   gap: 12px;
 }
 
-/* 筛选区域 */
 .filter-section {
   background: white;
   padding: 20px;
@@ -799,7 +1026,6 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-/* 摘要卡片 */
 .summary-cards {
   margin-bottom: 20px;
 }
@@ -854,22 +1080,6 @@ onBeforeUnmount(() => {
   color: #909399;
 }
 
-.card-trend {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-}
-
-.trend-up {
-  color: #f56c6c;
-}
-
-.trend-down {
-  color: #67c23a;
-}
-
-/* 图表区域 */
 .chart-section {
   margin-bottom: 20px;
 }
@@ -895,7 +1105,6 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
-/* 表格区域 */
 .table-section {
   margin-bottom: 20px;
 }
@@ -925,50 +1134,47 @@ onBeforeUnmount(() => {
   padding: 20px 0;
 }
 
-/* 货币值 */
 .currency-value {
   font-weight: bold;
   color: #409eff;
 }
 
-/* 上传对话框 */
-.upload-dialog-content {
-  padding: 10px 0;
-  max-height: 70vh;
-  overflow-y: auto;
+.numeric-cell {
+  color: #303133;
+  font-weight: 500;
 }
 
-/* 上传区域样式增强 */
-.upload-demo {
-  border: 2px dashed #409eff !important;
-  border-radius: 8px !important;
-  background-color: #f8fbff !important;
-  transition: all 0.3s ease;
+.percentage-cell {
+  color: #e6a23c;
+  font-weight: 500;
 }
 
-.upload-demo:hover {
-  border-color: #67c23a !important;
-  background-color: #f0f9ff !important;
+.highlight-cell {
+  color: #f56c6c;
+  font-weight: bold;
 }
 
-.el-upload__text {
-  font-size: 14px !important;
-  color: #606266 !important;
+.title-cell {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.el-upload__text em {
-  color: #409eff !important;
-  font-weight: 600;
+.detail-section {
+  margin-bottom: 24px;
 }
 
-.upload-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
+.detail-section-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 12px;
+  padding-left: 8px;
+  border-left: 3px solid #409eff;
 }
 
-/* 详情对话框 */
 .detail-dialog-content {
   padding: 10px 0;
 }
@@ -980,7 +1186,6 @@ onBeforeUnmount(() => {
   margin-top: 20px;
 }
 
-/* 响应式调整 */
 @media (max-width: 1200px) {
   .chart-section .el-col {
     width: 100%;
@@ -994,164 +1199,63 @@ onBeforeUnmount(() => {
     align-items: flex-start;
     gap: 16px;
   }
-  
+
   .filter-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
-  
+
   .table-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
-  
+
   .summary-cards .el-col {
     width: 100%;
     margin-bottom: 16px;
   }
 }
 
-/* 上传预览表格增强样式 */
-.even-row {
-  background-color: #fafafa !important;
+/* 表头问号说明样式 */
+.column-header-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
 }
 
-.odd-row {
-  background-color: #ffffff !important;
+.field-help-icon {
+  cursor: help;
+  font-size: 14px;
+  transition: color 0.2s;
 }
 
-.cell-content {
-  padding: 6px 10px;
-  font-size: 13px;
-  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  line-height: 1.5;
+.field-help-icon:hover {
+  color: #409eff !important;
 }
 
-/* 表格表头增强 */
-.preview-card .el-table th {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: #ffffff !important;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  border: none !important;
-  text-align: center;
-  height: 48px;
-  padding: 10px 0;
+/* 字段说明 Popover 内容样式 */
+:deep(.field-help-content) {
+  font-size: 12px;
+  line-height: 1.6;
 }
 
-/* 表格边框增强 */
-.preview-card .el-table {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+:deep(.field-help-item) {
+  margin-bottom: 8px;
 }
 
-/* 表格单元格悬停效果 */
-.preview-card .el-table--enable-row-hover .el-table__body tr:hover>td {
-  background-color: #f0f7ff !important;
-}
-
-/* 文件信息卡片样式增强 */
-.file-info {
-  background: linear-gradient(135deg, #f6f9ff 0%, #f0f5ff 100%);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px !important;
-  border: 1px solid #ebeef5;
-}
-
-.file-info div {
-  padding: 4px 0;
-  font-size: 13px;
-  color: #606266;
-}
-
-.file-info strong {
-  color: #303133;
-  font-weight: 600;
-}
-
-/* 单元格类型样式 */
-.empty-cell {
-  color: #c0c4cc;
-  font-style: italic;
-}
-
-.positive-amount {
-  color: #67c23a;
-  font-weight: 600;
-}
-
-.negative-amount {
-  color: #f56c6c;
-  font-weight: 600;
-}
-
-.numeric-cell {
-  color: #409eff;
-  font-weight: 500;
-}
-
-.percentage-cell {
-  color: #e6a23c;
-  font-weight: 500;
-}
-
-.date-cell {
-  color: #909399;
-  font-weight: 500;
-}
-
-.text-cell {
-  color: #606266;
-}
-
-/* 增强表格视觉效果 */
-.preview-card .el-table td {
-  border-right: 1px solid #ebeef5 !important;
-  border-bottom: 1px solid #ebeef5 !important;
-}
-
-.preview-card .el-table th.is-leaf {
-  border-bottom: 2px solid #409eff !important;
-}
-
-/* 列宽自适应 */
-.preview-card .el-table .el-table__body-wrapper {
-  overflow-x: auto;
-}
-
-/* 滚动条美化 */
-.preview-card .el-scrollbar__bar.is-vertical {
-  width: 6px;
-}
-
-.preview-card .el-scrollbar__thumb {
-  background-color: rgba(144, 147, 153, 0.3);
-  border-radius: 3px;
-}
-
-.preview-card .el-scrollbar__thumb:hover {
-  background-color: rgba(144, 147, 153, 0.5);
-}
-
-/* 店铺选择样式 */
-.shop-select-section {
-  margin-bottom: 24px;
-  padding: 16px;
-  background: #f5f7fa;
-  border-radius: 8px;
-}
-
-.shop-select-section .el-form-item {
+:deep(.field-help-item:last-child) {
   margin-bottom: 0;
 }
 
-.shop-tip {
-  margin-left: 12px;
-  color: #909399;
-  font-size: 12px;
+:deep(.field-help-label) {
+  font-weight: 600;
+  color: #303133;
+}
+
+:deep(.field-help-value) {
+  color: #606266;
 }
 </style>

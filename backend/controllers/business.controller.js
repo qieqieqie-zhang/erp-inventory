@@ -492,6 +492,27 @@ class BusinessController {
   }
 
   /**
+   * 清空所有业务报告
+   */
+  async deleteAll(req, res) {
+    try {
+      await BusinessReportModel.deleteAll();
+      res.json({
+        code: 200,
+        message: '清空成功',
+        data: null
+      });
+    } catch (error) {
+      console.error('清空业务报告错误:', error);
+      res.status(500).json({
+        code: 500,
+        message: '服务器内部错误',
+        data: null
+      });
+    }
+  }
+
+  /**
    * 导出业务报告数据
    */
   async exportReports(req, res) {

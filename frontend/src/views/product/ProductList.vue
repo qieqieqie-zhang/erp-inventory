@@ -3,10 +3,10 @@
     <!-- 页面标题和操作栏 -->
     <div class="page-header">
       <div class="header-left">
-        <h1 class="page-title">商品管理</h1>
+        <h1 class="page-title">商品资料</h1>
         <el-breadcrumb separator="/">
-          <el-breadcrumb-item>库存管理</el-breadcrumb-item>
-          <el-breadcrumb-item>商品列表</el-breadcrumb-item>
+          <el-breadcrumb-item>商品资料</el-breadcrumb-item>
+          <el-breadcrumb-item>商品资料列表</el-breadcrumb-item>
         </el-breadcrumb>
       </div>
       
@@ -66,7 +66,18 @@
             <el-option label="停售" value="inactive" />
           </el-select>
         </el-form-item>
-        
+
+        <el-form-item label="一级分类">
+          <el-select v-model="filterForm.category_id" placeholder="全部分类" clearable filterable style="width: 150px">
+            <el-option
+              v-for="cat in categoryList"
+              :key="cat.id"
+              :label="cat.category_name"
+              :value="cat.id"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="库存范围">
           <el-input-number
             v-model="filterForm.minQuantity"
@@ -173,89 +184,41 @@
           :default-sort="{ prop: 'seller_sku', order: 'ascending' }"
         >
           <el-table-column type="selection" width="55" />
-          
-          <el-table-column prop="seller_sku" label="SKU" width="180" sortable>
+
+          <el-table-column prop="product_name_cn" label="中文名称" min-width="160" show-overflow-tooltip sortable>
+            <template #default="{ row }">
+              <span>{{ row.product_name_cn || '-' }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="category_name" label="一级分类" width="120">
+            <template #default="{ row }">
+              <el-tag v-if="row.category_name" type="warning" size="small">
+                {{ row.category_name }}
+              </el-tag>
+              <span v-else class="text-muted">未分类</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="seller_sku" label="seller_sku" width="160" sortable>
             <template #default="{ row }">
               <el-link type="primary" @click="handleViewDetail(row.seller_sku)">
                 {{ row.seller_sku }}
               </el-link>
             </template>
           </el-table-column>
-          
-          <el-table-column prop="item_name" label="商品名称" min-width="200">
+
+          <el-table-column prop="domestic_inventory_qty" label="国内库存" width="100">
             <template #default="{ row }">
-              <div class="product-name">
-                <div class="name-text">{{ row.item_name || '未命名商品' }}</div>
-                <div class="asin-text" v-if="row.asin1">
-                  ASIN: {{ row.asin1 }}
-                </div>
-              </div>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="price" label="售价" width="120" sortable>
-            <template #default="{ row }">
-              <span v-if="row.price">¥{{ formatCurrency(row.price) }}</span>
-              <span v-else class="text-muted">-</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="quantity" label="可售库存" width="120" sortable>
-            <template #default="{ row }">
-              <el-tag 
-                :type="getStockTagType(row.quantity)"
+              <el-tag
+                :type="row.domestic_inventory_qty === 0 ? 'danger' : row.domestic_inventory_qty < 10 ? 'warning' : 'success'"
                 size="small"
               >
-                {{ row.quantity || 0 }}
+                {{ row.domestic_inventory_qty || 0 }}
               </el-tag>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="pending_quantity" label="待处理库存" width="120" sortable>
-            <template #default="{ row }">
-              {{ row.pending_quantity || 0 }}
             </template>
           </el-table-column>
 
-          <el-table-column label="库存分布" width="200">
-            <template #default="{ row }">
-              <span class="inv-tag">物流: {{ row.logistics_quantity || 0 }}</span>
-              <span class="inv-tag">FBA: {{ row.fba_inventory_quantity || 0 }}</span>
-              <span class="inv-tag">预留: {{ row.fba_reserved_quantity || 0 }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column prop="fulfillment_channel" label="配送渠道" width="120">
-            <template #default="{ row }">
-              <el-tag :type="row.fulfillment_channel === 'AMAZON_NA' ? 'success' : 'info'">
-                {{ formatChannel(row.fulfillment_channel) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="shop_id" label="所属店铺" width="140">
-            <template #default="{ row }">
-              <el-tag v-if="getShopName(row.shop_id)" type="primary">
-                {{ getShopName(row.shop_id) }}
-              </el-tag>
-              <span v-else class="text-muted">未关联</span>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="status" label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="getStatusTagType(row.status)">
-                {{ formatStatus(row.status) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          
-          <el-table-column prop="open_date" label="上架时间" width="160" sortable>
-            <template #default="{ row }">
-              {{ formatDate(row.open_date) }}
-            </template>
-          </el-table-column>
-          
           <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
               <el-button 
@@ -408,6 +371,7 @@ const filterForm = ref({
   search: '',
   shop_id: '',
   status: '',
+  category_id: '',
   minQuantity: null,
   maxQuantity: null
 })
@@ -422,6 +386,7 @@ const productList = ref([])
 const stats = ref({})
 const selectedProducts = ref([])
 const shopList = ref([]) // 店铺列表
+const categoryList = ref([]) // 分类列表
 
 // 对话框
 const showEditDialog = ref(false)
@@ -503,6 +468,7 @@ const loadData = async () => {
         pageSize: pageSize.value,
         search: filterForm.value.search,
         status: filterForm.value.status,
+        category_id: filterForm.value.category_id,
         minQuantity: filterForm.value.minQuantity,
         maxQuantity: filterForm.value.maxQuantity
       }),
@@ -530,6 +496,7 @@ const resetFilter = () => {
   filterForm.value = {
     search: '',
     status: '',
+    category_id: '',
     minQuantity: null,
     maxQuantity: null
   }
@@ -690,9 +657,20 @@ const loadShops = async () => {
   }
 }
 
+// 获取分类列表
+const loadCategories = async () => {
+  try {
+    const list = await apiService.category.getAllEnabled()
+    categoryList.value = list || []
+  } catch (error) {
+    console.error('获取分类列表失败:', error)
+  }
+}
+
 // 生命周期
 onMounted(() => {
   loadShops()
+  loadCategories()
   loadData()
 })
 </script>

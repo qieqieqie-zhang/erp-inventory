@@ -32,6 +32,13 @@ router.post('/upload', uploadSingle('file'), businessController.uploadReports);
 router.delete('/reports/:id', businessController.deleteReport);
 
 /**
+ * @route DELETE /api/business/all
+ * @desc 清空所有业务报告
+ * @access Private (管理员)
+ */
+router.delete('/all', businessController.deleteAll);
+
+/**
  * @route GET /api/business/export
  * @desc 导出业务报告数据
  * @access Private

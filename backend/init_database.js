@@ -90,8 +90,8 @@ async function initDatabase() {
     // 检查关键表
     const criticalTables = [
       'system_users',
-      'amazon_products',
-      'amazon_orders',
+      'product_master',
+      'amazon_order_items',
       'amazon_fba_inventory',
       'amazon_fba_reserved'
     ];

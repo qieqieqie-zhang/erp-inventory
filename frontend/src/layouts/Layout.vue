@@ -22,9 +22,9 @@
         active-text-color="#ffffff"
         class="sidebar-menu"
       >
-        <el-menu-item index="/dashboard" @click="navigateTo('/dashboard')">
-          <el-icon><DataBoard /></el-icon>
-          <template #title>数据看板</template>
+        <el-menu-item index="/cockpit" @click="navigateTo('/cockpit')">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>经营驾驶舱</template>
         </el-menu-item>
 
         <el-menu-item index="/shops" @click="navigateTo('/shops')">
@@ -35,24 +35,19 @@
         <el-sub-menu index="/products">
           <template #title>
             <el-icon><Goods /></el-icon>
-            <span>商品管理</span>
+            <span>商品资料</span>
           </template>
-          <el-menu-item index="/products/list" @click="navigateTo('/products/list')">商品列表</el-menu-item>
+          <el-menu-item index="/products/list" @click="navigateTo('/products/list')">商品资料列表</el-menu-item>
           <el-menu-item index="/products/upload" @click="navigateTo('/products/upload')">商品上传</el-menu-item>
+          <el-menu-item index="/products/category" @click="navigateTo('/products/category')">分类设置</el-menu-item>
+          <el-menu-item index="/products/inventory-log" @click="navigateTo('/products/inventory-log')">出入库记录</el-menu-item>
+          <el-menu-item index="/products/mapping" @click="navigateTo('/products/mapping')">映射管理</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="/orders">
-          <template #title>
-            <el-icon><Tickets /></el-icon>
-            <span>订单管理</span>
-          </template>
-          <el-menu-item index="/orders/yesterday" @click="navigateTo('/orders/yesterday')">昨日订单</el-menu-item>
-          <el-menu-item index="/orders/3days" @click="navigateTo('/orders/3days')">近3天</el-menu-item>
-          <el-menu-item index="/orders/7days" @click="navigateTo('/orders/7days')">近7天</el-menu-item>
-          <el-menu-item index="/orders/14days" @click="navigateTo('/orders/14days')">近14天</el-menu-item>
-          <el-menu-item index="/orders/30days" @click="navigateTo('/orders/30days')">近30天</el-menu-item>
-          <el-menu-item index="/orders/summary" @click="navigateTo('/orders/summary')">订单汇总</el-menu-item>
-        </el-sub-menu>
+        <el-menu-item index="/orders/summary" @click="navigateTo('/orders/summary')">
+          <el-icon><Tickets /></el-icon>
+          <template #title>订单销量汇总</template>
+        </el-menu-item>
 
         <el-sub-menu index="/fba">
           <template #title>
@@ -165,7 +160,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  DataBoard, Shop, Goods, Tickets, Box, TrendCharts, DataAnalysis, Setting,
+  Shop, Goods, Tickets, Box, TrendCharts, DataAnalysis, Setting,
   Bell, User, Lock, SwitchButton, Expand, Fold, ArrowDown, Van
 } from '@element-plus/icons-vue'
 import { useUserStore } from '../stores/user'

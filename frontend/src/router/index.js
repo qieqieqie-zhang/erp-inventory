@@ -5,14 +5,15 @@ import Layout from '../layouts/Layout.vue'
 
 // 页面组件（使用懒加载）
 const Login = () => import('../views/Login.vue')
-const Dashboard = () => import('../views/dashboard/Dashboard.vue')
+const Cockpit = () => import('../views/cockpit/Cockpit.vue')
 const ShopList = () => import('../views/shop/ShopList.vue')
 const ProductList = () => import('../views/product/ProductList.vue')
 const ProductUpload = () => import('../views/product/ProductUpload.vue')
 const ProductDetail = () => import('../views/product/ProductDetail.vue')
-const OrderList = () => import('../views/order/OrderList.vue')
+const ProductCategory = () => import('../views/product/ProductCategory.vue')
+const ProductNameSkuMapping = () => import('../views/product/ProductNameSkuMapping.vue')
+const InventoryLog = () => import('../views/product/InventoryLog.vue')
 const OrderSummary = () => import('../views/order/OrderSummary.vue')
-const OrderDetail = () => import('../views/order/OrderDetail.vue')
 const FBAInventory = () => import('../views/fba/FBAInventory.vue')
 const FBAReserved = () => import('../views/fba/FBAReserved.vue')
 const LogisticsList = () => import('../views/logistics/LogisticsList.vue')
@@ -32,14 +33,14 @@ const routes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/dashboard',
+    redirect: '/cockpit',
     meta: { requiresAuth: true },
     children: [
       {
-        path: 'dashboard',
-        name: 'Dashboard',
-        component: Dashboard,
-        meta: { title: '数据看板', icon: 'DataBoard' }
+        path: 'cockpit',
+        name: 'Cockpit',
+        component: Cockpit,
+        meta: { title: '经营驾驶舱', icon: 'DataAnalysis' }
       },
       // 店铺管理
       {
@@ -48,24 +49,42 @@ const routes = [
         component: ShopList,
         meta: { title: '店铺管理', icon: 'Shop' }
       },
-      // 商品管理
+      // 商品资料
       {
         path: 'products',
         name: 'Products',
         redirect: '/products/list',
-        meta: { title: '商品管理', icon: 'Goods' },
+        meta: { title: '商品资料', icon: 'Goods' },
         children: [
           {
             path: 'list',
             name: 'ProductList',
             component: ProductList,
-            meta: { title: '商品列表' }
+            meta: { title: '商品资料列表' }
           },
           {
             path: 'upload',
             name: 'ProductUpload',
             component: ProductUpload,
-            meta: { title: '商品上传', roles: ['admin'] }
+            meta: { title: '商品上传' }
+          },
+          {
+            path: 'category',
+            name: 'ProductCategory',
+            component: ProductCategory,
+            meta: { title: '分类设置' }
+          },
+          {
+            path: 'inventory-log',
+            name: 'InventoryLog',
+            component: InventoryLog,
+            meta: { title: '出入库记录' }
+          },
+          {
+            path: 'mapping',
+            name: 'ProductNameSkuMapping',
+            component: ProductNameSkuMapping,
+            meta: { title: '映射管理' }
           },
           {
             path: 'detail/:sku',
@@ -79,50 +98,14 @@ const routes = [
       {
         path: 'orders',
         name: 'Orders',
-        redirect: '/orders/yesterday',
+        redirect: '/orders/summary',
         meta: { title: '订单管理', icon: 'Tickets' },
         children: [
-          {
-            path: 'yesterday',
-            name: 'OrderYesterday',
-            component: OrderList,
-            meta: { title: '昨日订单', dimension: 'yesterday' }
-          },
-          {
-            path: '3days',
-            name: 'Order3Days',
-            component: OrderList,
-            meta: { title: '近3天订单', dimension: '3days' }
-          },
-          {
-            path: '7days',
-            name: 'Order7Days',
-            component: OrderList,
-            meta: { title: '近7天订单', dimension: '7days' }
-          },
-          {
-            path: '14days',
-            name: 'Order14Days',
-            component: OrderList,
-            meta: { title: '近14天订单', dimension: '14days' }
-          },
-          {
-            path: '30days',
-            name: 'Order30Days',
-            component: OrderList,
-            meta: { title: '近30天订单', dimension: '30days' }
-          },
           {
             path: 'summary',
             name: 'OrderSummary',
             component: OrderSummary,
             meta: { title: '订单销量汇总' }
-          },
-          {
-            path: 'detail/:id',
-            name: 'OrderDetail',
-            component: OrderDetail,
-            meta: { title: '订单详情', hidden: true }
           }
         ]
       },
@@ -200,7 +183,7 @@ const routes = [
   // 404页面
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/dashboard'
+    redirect: '/cockpit'
   }
 ]
 

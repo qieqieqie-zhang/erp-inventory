@@ -37,12 +37,24 @@
           >
             {{ tag.label }}
           </el-tag>
+          <el-popover
+            placement="bottom-start"
+            :width="720"
+            trigger="hover"
+          >
+            <template #reference>
+              <el-icon class="detail-status-help-icon">
+                <QuestionFilled />
+              </el-icon>
+            </template>
+            <InventoryStatusHelp />
+          </el-popover>
         </div>
 
         <div class="summary-stats">
           <div class="stat-item">
             <span class="stat-label">可售库存</span>
-            <span class="stat-value">{{ data.available || 0 }}</span>
+            <span class="stat-value" :class="data.available === 0 ? 'stat-danger' : ''">{{ data.available || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">近30天销量</span>
@@ -50,15 +62,31 @@
           </div>
           <div class="stat-item">
             <span class="stat-label">可售天数</span>
-            <span class="stat-value" :class="getDaysClass(data.days_of_supply)">{{ data.days_of_supply || 0 }}</span>
+            <span class="stat-value" :class="getDaysClass(data.days_of_supply, data.units_shipped_t30)">{{ formatDaysOfSupply(data) }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">入库中</span>
-            <span class="stat-value">{{ data.inbound_quantity || 0 }}</span>
+            <span class="stat-value" :class="data.inbound_quantity > 0 ? 'stat-primary' : ''">{{ data.inbound_quantity || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">仓间调拨</span>
+            <span class="stat-value" :class="data.reserved_fc_transfer > 0 ? 'stat-primary' : ''">{{ data.reserved_fc_transfer || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">总保留</span>
+            <span class="stat-value" :class="data.total_reserved_quantity > 0 ? 'stat-warning' : ''">{{ data.total_reserved_quantity || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">补货判断</span>
+            <span class="stat-value">{{ data.replenishment_cover_inventory || 0 }}</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">不可售</span>
+            <span class="stat-value" :class="data.unfulfillable_quantity > 0 ? 'stat-purple' : ''">{{ data.unfulfillable_quantity || 0 }}</span>
           </div>
           <div class="stat-item">
             <span class="stat-label">预计过剩</span>
-            <span class="stat-value danger">{{ data.estimated_excess_quantity || 0 }}</span>
+            <span class="stat-value" :class="data.estimated_excess_quantity > 0 ? 'stat-danger' : ''">{{ data.estimated_excess_quantity || 0 }}</span>
           </div>
         </div>
 
@@ -69,7 +97,7 @@
             运营建议
           </div>
           <div class="suggestion-content">
-            {{ data.operation_suggestion || '暂无建议' }}
+            {{ formatSuggestion(data.operational_suggestion) }}
           </div>
         </div>
       </div>
@@ -148,11 +176,13 @@
         <el-tab-pane label="补货与在途" name="replenish">
           <el-descriptions :column="2" border>
             <el-descriptions-item label="可售天数">
-              <span :class="getDaysClass(data.days_of_supply)">{{ data.days_of_supply || 0 }}</span>
+              <span :class="getDaysClass(data.days_of_supply, data.units_shipped_t30)">{{ formatDaysOfSupply(data) }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="历史可售天数">{{ data.historical_days_of_supply || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="含在途总库存">{{ data.total_available_with_inbound || 0 }}</el-descriptions-item>
-            <el-descriptions-item label="含在途可售天数">{{ (data.estimated_cover_days_with_inbound || 0).toFixed(0) }}</el-descriptions-item>
+            <el-descriptions-item label="补货判断库存">{{ data.replenishment_cover_inventory || 0 }}</el-descriptions-item>
+            <el-descriptions-item label="含保留调拨可售天数">{{ data.estimated_cover_days_with_reserved != null ? data.estimated_cover_days_with_reserved : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="立即可售天数">{{ data.immediate_cover_days != null ? data.immediate_cover_days : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="可恢复保留库存">{{ data.recoverable_reserved_inventory || 0 }}</el-descriptions-item>
             <el-descriptions-item label="入库中库存">{{ data.inbound_quantity || 0 }}</el-descriptions-item>
             <el-descriptions-item label="FBA最低库存水平">{{ data.fba_minimum_inventory_level || '-' }}</el-descriptions-item>
             <el-descriptions-item label="建议发货数量">{{ data.recommended_ship_in_quantity || '-' }}</el-descriptions-item>
@@ -161,7 +191,7 @@
             <el-descriptions-item label="90天覆盖周数">{{ data.weeks_of_cover_t90 || '-' }}</el-descriptions-item>
             <el-descriptions-item label="FBA库存健康状态">
               <el-tag size="small" :type="getHealthType(data.fba_inventory_level_health_status)">
-                {{ data.fba_inventory_level_health_status || '-' }}
+                {{ data.status_text || '-' }}
               </el-tag>
             </el-descriptions-item>
           </el-descriptions>
@@ -184,13 +214,42 @@
             <el-descriptions-item label="181天以上库存">
               <span class="highlight-value">{{ data.aged_inventory_181_plus || 0 }}</span>
             </el-descriptions-item>
-            <el-descriptions-item label="271天以上库存">
-              <span class="danger-text">{{ data.aged_inventory_271_plus || 0 }}</span>
+            <el-descriptions-item label="366天以上库存">
+              <span class="danger-text">{{ data.aged_inventory_366_plus || 0 }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="下月预计仓储费">
               <span class="price-value">${{ formatNumber(data.estimated_storage_cost_next_month) }}</span>
             </el-descriptions-item>
           </el-descriptions>
+
+          <el-divider content-position="left">库龄风险判断</el-divider>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="FBA相关库存">
+              <span class="highlight-value">{{ data.fba_related_inventory || 0 }}</span>
+              <span class="field-note">（可售+保留+不可售+移除中）</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="库龄风险状态">
+              <el-tag v-if="data.has_aged_inventory_risk" type="danger" size="small">存在库龄风险</el-tag>
+              <el-tag v-else type="success" size="small">无库龄风险</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="高库龄风险状态" :span="2">
+              <el-tag v-if="data.has_high_aged_inventory_risk" type="danger" size="small">存在高库龄风险</el-tag>
+              <el-tag v-else type="success" size="small">无高库龄风险</el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <!-- 无可售库存但有老库存的解释 -->
+          <div v-if="data.available === 0 && data.aged_inventory_181_plus > 0" class="aged-inventory-note">
+            <el-alert type="warning" :closable="false" show-icon>
+              <template #title>
+                <strong>无可售库存但存在老库存说明</strong>
+              </template>
+              <template #default>
+                该SKU当前无可售库存（available=0），但仍存在{{ data.aged_inventory_181_plus }}件181天以上库存。
+                这些老库存在保留、不可售、移除中或仓内处理状态，请查看"库存实时状态"分组确认具体分布。
+              </template>
+            </el-alert>
+          </div>
 
           <el-divider content-position="left">库龄附加费</el-divider>
           <el-descriptions :column="3" border size="small">
@@ -247,7 +306,8 @@
 <script setup>
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled, QuestionFilled } from '@element-plus/icons-vue'
+import InventoryStatusHelp from '../../../components/fba/InventoryStatusHelp.vue'
 
 const dialogVisible = ref(false)
 const data = ref(null)
@@ -277,14 +337,42 @@ const formatFieldValue = (value) => {
   return String(value)
 }
 
+// 格式化运营建议（数组转纯文本）
+const formatSuggestion = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join('；')
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) {
+        return parsed.filter(Boolean).join('；')
+      }
+    } catch (e) {}
+    return value
+  }
+  return '-'
+}
+
+// 格式化可售天数（无销量时显示 "-"）
+const formatDaysOfSupply = (row) => {
+  const units30 = parseInt(row.units_shipped_t30) || 0
+  const days = parseInt(row.days_of_supply) || 0
+  if (units30 === 0) return '-'
+  return days
+}
+
 const isSystemField = (key) => {
   return ['inventoryTags', 'operation_suggestion', 'daily_sales_t7', 'daily_sales_t30',
     'daily_sales_t90', 'sales_trend_ratio', 'total_available_with_inbound',
     'estimated_cover_days_with_inbound', 'aged_inventory_181_plus', 'aged_inventory_271_plus', '_raw'].includes(key)
 }
 
-const getDaysClass = (days) => {
+const getDaysClass = (days, unitsShippedT30) => {
   const d = parseInt(days) || 0
+  const u = parseInt(unitsShippedT30) || 0
+  // 无销量时不显示红色
+  if (u === 0) return ''
   if (d === 0) return 'danger-text'
   if (d < 20) return 'danger-text'
   if (d < 45) return 'warning-text'
@@ -421,6 +509,18 @@ defineExpose({ open })
   color: #303133;
 }
 
+.stat-item .stat-value.stat-danger {
+  color: #f56c6c;
+}
+
+.stat-item .stat-value.stat-primary {
+  color: #409eff;
+}
+
+.stat-item .stat-value.stat-purple {
+  color: #9c27b0;
+}
+
 /* 运营建议框 */
 .suggestion-box {
   margin-top: 16px;
@@ -525,5 +625,30 @@ defineExpose({ open })
 
 .el-divider {
   margin: 16px 0;
+}
+
+/* 库龄风险说明 */
+.aged-inventory-note {
+  margin-top: 12px;
+}
+
+.field-note {
+  font-size: 11px;
+  color: #909399;
+  margin-left: 4px;
+}
+
+/* 详情页状态帮助图标 */
+.detail-status-help-icon {
+  margin-left: 4px;
+  color: #909399;
+  cursor: pointer;
+  font-size: 14px;
+  vertical-align: middle;
+  transition: color 0.2s;
+}
+
+.detail-status-help-icon:hover {
+  color: #409EFF;
 }
 </style>
