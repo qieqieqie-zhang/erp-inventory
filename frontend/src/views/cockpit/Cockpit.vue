@@ -113,14 +113,13 @@
       <el-card shadow="never">
         <template #header>
           <div class="table-header">
-            <span class="table-title">经营核心总表</span>
             <div class="table-actions">
               <!-- 搜索 -->
               <el-input
                 v-model="filters.search"
                 placeholder="SKU/商品名称/ASIN"
                 :prefix-icon="Search"
-                style="width: 180px; margin-right: 10px;"
+                style="width: 180px;"
                 clearable
                 @input="handleFilterChange"
               />
@@ -128,7 +127,7 @@
               <el-select
                 v-model="filters.replenishment"
                 placeholder="补货建议"
-                style="width: 120px; margin-right: 10px;"
+                style="width: 120px;"
                 clearable
                 @change="handleFilterChange"
               >
@@ -142,7 +141,7 @@
               <el-select
                 v-model="filters.riskTag"
                 placeholder="风险标签"
-                style="width: 120px; margin-right: 10px;"
+                style="width: 120px;"
                 clearable
                 @change="handleFilterChange"
               >
@@ -157,7 +156,7 @@
               <el-select
                 v-model="filters.hasInTransit"
                 placeholder="在途"
-                style="width: 100px; margin-right: 10px;"
+                style="width: 100px;"
                 clearable
                 @change="handleFilterChange"
               >
@@ -169,7 +168,7 @@
               <el-select
                 v-model="filters.categoryId"
                 placeholder="一级分类"
-                style="width: 140px; margin-right: 10px;"
+                style="width: 140px;"
                 clearable
                 filterable
                 @change="handleFilterChange"
@@ -182,7 +181,7 @@
                 />
               </el-select>
             </div>
-          </div>
+                      </div>
         </template>
 
         <el-table
@@ -1145,6 +1144,8 @@ onBeforeUnmount(() => {
 .table-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .product-name-cell {

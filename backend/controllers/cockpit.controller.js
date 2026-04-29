@@ -285,6 +285,8 @@ const cockpitController = {
    */
   async getCoreTable(req, res) {
     try {
+      console.log('===== getCoreTable 被调用 =====');
+      console.log('query:', req.query);
       const {
         page = 1,
         pageSize = 50,
@@ -497,6 +499,9 @@ const cockpitController = {
 
       // ========== 7. 应用过滤条件 ==========
       let filteredData = combinedData;
+      console.log('combinedData总数:', combinedData.length);
+      console.log('productSkuMap大小:', productSkuMap.size);
+      console.log('category_id参数:', category_id);
 
       // 搜索过滤
       if (search) {
@@ -526,11 +531,29 @@ const cockpitController = {
       }
 
       // 分类过滤
-      if (category_id) {
+      const categoryIdStr = String(category_id || '');
+      console.log('分类过滤 - category_id:', category_id, 'categoryIdStr:', categoryIdStr);
+      console.log('分类过滤前filteredData数量:', filteredData.length);
+      if (filteredData.length > 0) {
+        console.log('filteredData[0]:', JSON.stringify(filteredData[0]));
+      }
+      if (categoryIdStr.trim() !== '' && categoryIdStr !== 'null' && categoryIdStr !== 'undefined') {
+        console.log('进入分类过滤逻辑');
+        const filterCategoryId = parseInt(category_id);
+        // 调试：检查 productSkuMap 中有多少条数据，以及它们的 category_id
+        const debugProductData = Object.keys(productSkuMap).slice(0, 3).map(sku => ({
+          sku,
+          category_id: productSkuMap[sku].category_id,
+          category_id_type: typeof productSkuMap[sku].category_id
+        }));
+        console.log('分类过滤调试 - productSkuMap样本:', JSON.stringify(debugProductData));
+        console.log('分类过滤调试 - filterCategoryId:', filterCategoryId, 'type:', typeof filterCategoryId);
         filteredData = filteredData.filter(item => {
           const productData = productSkuMap[item.sku];
-          return productData && productData.category_id === parseInt(category_id);
+          if (!productData) return false;
+          return parseInt(productData.category_id) === filterCategoryId;
         });
+        console.log('分类过滤后filteredData数量:', filteredData.length);
       }
 
       // ========== 5. 排序 ==========
