@@ -31,6 +31,39 @@ const parseNum = (v) => {
 };
 
 /**
+ * 尺码排序映射
+ * 将尺码字符串映射为数字排序值：M=1, L=2, XL=3, 2XL=4, 3XL=5, 4XL=6, 5XL=7
+ */
+const SIZE_ORDER_MAP = {
+  'xs': 0, 's': 1, 'm': 2, 'l': 3, 'xl': 4,
+  '2xl': 5, '3xl': 6, '4xl': 7, '5xl': 8,
+  '6xl': 9, '7xl': 10, '8xl': 11
+};
+
+/**
+ * 从SKU中提取尺码并返回排序值
+ */
+const getSizeSortValue = (sku) => {
+  if (!sku) return 999;
+  const upperSku = String(sku).toUpperCase();
+  // 匹配尺码模式：2XL, 3XL, M, L, XL 等
+  const sizePatterns = [
+    /(\d+)X?L\b/i,  // 2XL, 3XL, XL
+    /\b(X?L)\b/i,   // M, L, XL
+    /\b(X?S)\b/i    // XS, S
+  ];
+
+  for (const pattern of sizePatterns) {
+    const match = upperSku.match(pattern);
+    if (match) {
+      const sizeStr = match[0].toLowerCase();
+      return SIZE_ORDER_MAP[sizeStr] !== undefined ? SIZE_ORDER_MAP[sizeStr] : 999;
+    }
+  }
+  return 999;
+};
+
+/**
  * 补货建议计算
  * @param {Object} item - SKU数据对象
  * @param {Object} options - { onlyLogistics: boolean } 表示是否只有物流数据
@@ -41,6 +74,8 @@ const calculateReplenishment = (item, options = {}) => {
   const daysOfSupply = item.days_of_supply;
   const inTransitQty = item.in_transit_quantity || 0;
   const sales7days = item.sales_7days || 0;
+  const sales1day = item.sales_1day || 0;
+  const sales3days = item.sales_3days || 0;
 
   // 只有物流数据，无库存和订单时
   if (onlyLogistics) {
@@ -52,6 +87,10 @@ const calculateReplenishment = (item, options = {}) => {
     return { suggestion: '无法判断', suggestionType: 'info' };
   }
 
+  // 检测近期断单风险：近7天有销量但近1天/近3天突然没销量
+  const avgDaily7days = sales7days / 7;
+  const hasStockOutTrend = sales7days > 0 && sales1day === 0 && sales3days < avgDaily7days * 0.5;
+
   if (available === 0 && inTransitQty === 0) {
     return { suggestion: '立即补货', suggestionType: 'danger' };
   }
@@ -61,6 +100,11 @@ const calculateReplenishment = (item, options = {}) => {
       return { suggestion: '观察在途', suggestionType: 'warning' };
     }
     return { suggestion: '立即补货', suggestionType: 'danger' };
+  }
+
+  // 近期断单风险：虽然库存足够，但突然没订单了，建议关注
+  if (hasStockOutTrend) {
+    return { suggestion: '关注销售', suggestionType: 'warning' };
   }
 
   if (daysOfSupply > 45 && sales7days < 5) {
@@ -153,7 +197,8 @@ const cockpitController = {
    */
   async getOverview(req, res) {
     try {
-      const { shop_id = '', time_range = '7' } = req.query;
+      const { shop_code = '', time_range = '7' } = req.query;
+      console.log('[Cockpit getOverview] 收到 shop_code:', shop_code);
       const days = parseInt(time_range) || 7;
 
       // 1. 获取近N天订单汇总
@@ -161,7 +206,7 @@ const cockpitController = {
       const { start: monthStart, end: monthEnd } = getDateRange(30);
 
       const orderOptions = {
-        storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         endDate: periodEnd
       };
 
@@ -189,17 +234,18 @@ const cockpitController = {
       // 2. 获取业务报告汇总（会话数、转化率）
       const businessSummary = await BusinessReportModel.getReportSummary(
         monthStart.toISOString().split('T')[0],
-        monthEnd.toISOString().split('T')[0]
+        monthEnd.toISOString().split('T')[0],
+        shop_code
       );
 
       // 3. 获取FBA库存统计
-      const fbaStats = await FBAInventoryModel.getInventoryStats();
+      const fbaStats = await FBAInventoryModel.getInventoryStats({ shop_code });
 
       // 4. 获取FBA预留统计
-      const reservedStats = await FBAReservedModel.getReservedStats();
+      const reservedStats = await FBAReservedModel.getReservedStats({ shop_code });
 
       // 5. 获取物流统计
-      const logisticsStats = await LogisticsModel.getStats();
+      const logisticsStats = await LogisticsModel.getStats({ shop_code });
 
       // 6. 计算断货风险SKU数和补货建议SKU数
       // 从FBA库存列表中分析
@@ -222,7 +268,7 @@ const cockpitController = {
       });
 
       // 6.1 从物流模块获取在途SKU数量（不依赖FBA库存）
-      const inTransitCount = await LogisticsModel.getInTransitSkuCount();
+      const inTransitCount = await LogisticsModel.getInTransitSkuCount(null, shop_code);
 
       res.json({
         code: 200,
@@ -285,18 +331,17 @@ const cockpitController = {
    */
   async getCoreTable(req, res) {
     try {
-      console.log('===== getCoreTable 被调用 =====');
-      console.log('query:', req.query);
       const {
         page = 1,
         pageSize = 50,
-        shop_id = '',
+        shop_code = '',
         time_range = '7',
         search = '',
         replenishment = '',
         risk_tag = '',
         has_in_transit = '',
-        category_id = ''
+        category_id = '',
+        fulfillment_channel = ''
       } = req.query;
 
       const { start: weekStart, end: weekEnd } = getDateRange(7);
@@ -307,24 +352,24 @@ const cockpitController = {
 
       // 1.1 从订单模块获取SKU
       const orderOptions = {
-        storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         endDate: weekEnd
       };
       const skuSalesData = await OrderItemModel.getSkuMultiWindowSales(orderOptions);
       skuSalesData.forEach(item => { if (item.sku) allSkus.add(item.sku); });
 
       // 1.2 从FBA库存模块获取SKU
-      const fbaList = await FBAInventoryModel.getInventoryList({ page: 1, pageSize: 500 });
+      const fbaList = await FBAInventoryModel.getInventoryList({ page: 1, pageSize: 500, shop_code });
       const fbaItems = Array.isArray(fbaList) ? fbaList : (fbaList.data || []);
       fbaItems.forEach(item => { if (item.seller_sku) allSkus.add(item.seller_sku); });
 
       // 1.3 从FBA预留模块获取SKU
-      const reservedList = await FBAReservedModel.getReservedList({ page: 1, pageSize: 500 });
+      const reservedList = await FBAReservedModel.getReservedList({ page: 1, pageSize: 500, shop_code });
       const reservedItems = Array.isArray(reservedList) ? reservedList : (reservedList.data || []);
       reservedItems.forEach(item => { if (item.sku) allSkus.add(item.sku); });
 
-      // 1.4 从物流模块获取SKU（所有状态，不只是in_transit）
-      const logisticsListAll = await LogisticsModel.getList({ page: 1, pageSize: 500 });
+      // 1.4 从物流模块获取SKU
+      const logisticsListAll = await LogisticsModel.getList({ page: 1, pageSize: 500, shop_code });
       const logisticsItemsAll = Array.isArray(logisticsListAll) ? logisticsListAll : (logisticsListAll.data || []);
       logisticsItemsAll.forEach(item => {
         try {
@@ -347,7 +392,7 @@ const cockpitController = {
       businessReports.forEach(item => { if (item.sku) allSkus.add(item.sku); });
 
       // 1.6 从商品资料模块获取SKU
-      const productList = await ProductModel.getProductList({ page: 1, pageSize: 500 });
+      const productList = await ProductModel.getProductList({ page: 1, pageSize: 500, shop_code });
       const productItems = Array.isArray(productList) ? productList : (productList.data || []);
       productItems.forEach(item => { if (item.seller_sku) allSkus.add(item.seller_sku); });
 
@@ -499,9 +544,6 @@ const cockpitController = {
 
       // ========== 7. 应用过滤条件 ==========
       let filteredData = combinedData;
-      console.log('combinedData总数:', combinedData.length);
-      console.log('productSkuMap大小:', productSkuMap.size);
-      console.log('category_id参数:', category_id);
 
       // 搜索过滤
       if (search) {
@@ -509,6 +551,7 @@ const cockpitController = {
         filteredData = filteredData.filter(item =>
           (item.sku && item.sku.toLowerCase().includes(keyword)) ||
           (item.product_name && item.product_name.toLowerCase().includes(keyword)) ||
+          (item.product_name_cn && item.product_name_cn.toLowerCase().includes(keyword)) ||
           (item.asin && item.asin.toLowerCase().includes(keyword))
         );
       }
@@ -530,30 +573,42 @@ const cockpitController = {
         filteredData = filteredData.filter(item => item.in_transit_quantity === 0);
       }
 
+      // 店铺过滤：通过商品资料表关联，SKU必须属于该店铺
+      // 注意：由于productList已经按shop_code过滤，productSkuMap中只有该店铺的商品
+      // 所以这里不需要额外过滤，但如果shop_code为空则显示所有
+
       // 分类过滤
       const categoryIdStr = String(category_id || '');
-      console.log('分类过滤 - category_id:', category_id, 'categoryIdStr:', categoryIdStr);
-      console.log('分类过滤前filteredData数量:', filteredData.length);
-      if (filteredData.length > 0) {
-        console.log('filteredData[0]:', JSON.stringify(filteredData[0]));
-      }
       if (categoryIdStr.trim() !== '' && categoryIdStr !== 'null' && categoryIdStr !== 'undefined') {
-        console.log('进入分类过滤逻辑');
-        const filterCategoryId = parseInt(category_id);
-        // 调试：检查 productSkuMap 中有多少条数据，以及它们的 category_id
-        const debugProductData = Object.keys(productSkuMap).slice(0, 3).map(sku => ({
-          sku,
-          category_id: productSkuMap[sku].category_id,
-          category_id_type: typeof productSkuMap[sku].category_id
-        }));
-        console.log('分类过滤调试 - productSkuMap样本:', JSON.stringify(debugProductData));
-        console.log('分类过滤调试 - filterCategoryId:', filterCategoryId, 'type:', typeof filterCategoryId);
         filteredData = filteredData.filter(item => {
           const productData = productSkuMap[item.sku];
           if (!productData) return false;
-          return parseInt(productData.category_id) === filterCategoryId;
+          return parseInt(productData.category_id) === parseInt(category_id);
         });
-        console.log('分类过滤后filteredData数量:', filteredData.length);
+      }
+
+      // FBA/FBM过滤
+      if (fulfillment_channel) {
+        filteredData = filteredData.filter(item => {
+          const productData = productSkuMap[item.sku];
+          // 判断FBA/FBM：有FBA库存数据的是FBA，只有订单数据的是FBM
+          const hasFbaData = !!fbaSkuMap[item.sku];
+          const hasOrderData = !!orderSkuMap[item.sku];
+
+          if (fulfillment_channel === 'FBA') {
+            // FBA: 有FBA库存记录的
+            return hasFbaData;
+          } else if (fulfillment_channel === 'FBM') {
+            // FBM: 没有FBA库存记录但有订单数据，或者商品资料标注为自发货
+            if (hasFbaData) return false;
+            if (productData) {
+              return productData.fulfillment_channel === '自发货' || !productData.fulfillment_channel;
+            }
+            // 没有商品资料也没有FBA库存数据，按订单判断
+            return hasOrderData;
+          }
+          return true;
+        });
       }
 
       // ========== 5. 排序 ==========
@@ -605,7 +660,7 @@ const cockpitController = {
    */
   async getAlerts(req, res) {
     try {
-      const { shop_id = '', time_range = '7' } = req.query;
+      const { shop_code = '', time_range = '7' } = req.query;
       const days = parseInt(time_range) || 7;
 
       const { start: monthStart, end: monthEnd } = getDateRange(30);
@@ -615,24 +670,24 @@ const cockpitController = {
 
       // 1.1 从订单模块获取SKU
       const orderOptions = {
-        storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         endDate: new Date()
       };
       const skuSalesData = await OrderItemModel.getSkuMultiWindowSales(orderOptions);
       skuSalesData.forEach(item => { if (item.sku) allSkus.add(item.sku); });
 
       // 1.2 从FBA库存模块获取SKU
-      const fbaList = await FBAInventoryModel.getInventoryList({ page: 1, pageSize: 500 });
+      const fbaList = await FBAInventoryModel.getInventoryList({ page: 1, pageSize: 500, shop_code });
       const fbaItems = Array.isArray(fbaList) ? fbaList : (fbaList.data || []);
       fbaItems.forEach(item => { if (item.seller_sku) allSkus.add(item.seller_sku); });
 
       // 1.3 从FBA预留模块获取SKU
-      const reservedList = await FBAReservedModel.getReservedList({ page: 1, pageSize: 500 });
+      const reservedList = await FBAReservedModel.getReservedList({ page: 1, pageSize: 500, shop_code });
       const reservedItems = Array.isArray(reservedList) ? reservedList : (reservedList.data || []);
       reservedItems.forEach(item => { if (item.sku) allSkus.add(item.sku); });
 
       // 1.4 从物流模块获取SKU
-      const logisticsList = await LogisticsModel.getList({ page: 1, pageSize: 500 });
+      const logisticsList = await LogisticsModel.getList({ page: 1, pageSize: 500, shop_code });
       const logisticsItems = Array.isArray(logisticsList) ? logisticsList : (logisticsList.data || []);
       logisticsItems.forEach(item => {
         try {
@@ -655,7 +710,7 @@ const cockpitController = {
       businessReports.forEach(item => { if (item.sku) allSkus.add(item.sku); });
 
       // 1.6 从商品资料模块获取SKU
-      const productList = await ProductModel.getProductList({ page: 1, pageSize: 500 });
+      const productList = await ProductModel.getProductList({ page: 1, pageSize: 500, shop_code });
       const productItems = Array.isArray(productList) ? productList : (productList.data || []);
       productItems.forEach(item => { if (item.seller_sku) allSkus.add(item.seller_sku); });
 

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useShopStore } from '../stores/shop'
 
 // 创建axios实例
 const api = axios.create({
@@ -6,9 +7,29 @@ const api = axios.create({
   timeout: 10000
 })
 
+// 需要自动注入 shop_code 的模块
+// URL 中的模块名可能与这里不完全一致，需要配置别名映射
+const SHOP_AWARE_MODULES = [
+  'cockpit',
+  'products',    // 别名: product (单数)
+  'orders',
+  'fba',
+  'logistics',
+  'business',
+  'domesticInventory',  // 别名: domestic-inventory (连字符)
+  'productNameSkuMapping'  // 别名: product-name-sku-mapping (连字符)
+]
+
+// URL 模块名 -> shop_code 模块名的映射
+const MODULE_ALIAS_MAP = {
+  'product': 'products',
+  'domestic-inventory': 'domesticInventory',
+  'product-name-sku-mapping': 'productNameSkuMapping'
+}
+
 // 请求拦截器
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
     // 从localStorage获取token
     const token = localStorage.getItem('token')
     if (token) {
@@ -18,6 +39,40 @@ api.interceptors.request.use(
     if (!(config.data instanceof FormData)) {
       config.headers['Content-Type'] = 'application/json'
     }
+
+    // 自动注入 shop_code
+    const url = config.url || ''
+    // 支持连字符的模块名 (如 domestic-inventory)
+    const moduleMatch = url.match(/^\/([a-zA-Z-]+)/)
+    if (moduleMatch) {
+      // 获取原始模块名，并转换为标准模块名
+      const rawModule = moduleMatch[1]
+      const module = MODULE_ALIAS_MAP[rawModule] || rawModule
+      if (SHOP_AWARE_MODULES.includes(module)) {
+        // 获取当前店铺代码
+        const shopStore = useShopStore()
+
+        // 如果 shops 还没加载，等待一下（最多等3秒）
+        if (shopStore.shops.length === 0) {
+          const waitStart = Date.now()
+          while (shopStore.shops.length === 0 && Date.now() - waitStart < 3000) {
+            await new Promise(r => setTimeout(r, 100))
+          }
+        }
+
+        const shopCode = shopStore.currentShopCode
+        console.log('[API拦截器] 模块:', module, '当前店铺:', shopCode, 'URL:', url)
+        if (shopCode) {
+          // 合并到 params
+          config.params = {
+            ...config.params,
+            shop_code: shopCode
+          }
+          console.log('[API拦截器] 已注入 shop_code:', shopCode)
+        }
+      }
+    }
+
     return config
   },
   (error) => {
@@ -43,10 +98,12 @@ api.interceptors.response.use(
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          // token过期或无效，清除token并跳转到登录页
+          // token过期或无效，清除token并跳转到登录页（仅当不在登录页时）
           localStorage.removeItem('token')
           localStorage.removeItem('userInfo')
-          window.location.href = '/login'
+          if (!location.pathname.startsWith('/login')) {
+            window.location.href = '/login'
+          }
           break
         case 403:
           return Promise.reject(new Error('权限不足'))
@@ -177,7 +234,7 @@ export const apiService = {
     delete: (sku) => api.delete(`/product/${sku}`),
     
     // 获取产品统计信息
-    getStats: () => api.get('/product/stats'),
+    getStats: (params) => api.get('/product/stats', { params }),
     
     // 获取SKU列表（用于下拉选择）
     getSkuList: () => api.get('/product/sku-list'),

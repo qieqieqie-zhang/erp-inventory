@@ -62,6 +62,7 @@ class ProductNameSkuMappingModel extends BaseModel {
       page = 1,
       pageSize = 20,
       shop_id = null,
+      shop_code = '',
       search = ''
     } = options;
 
@@ -76,6 +77,12 @@ class ProductNameSkuMappingModel extends BaseModel {
     if (shop_id) {
       sql += ' AND m.shop_id = ?';
       params.push(shop_id);
+    }
+
+    // 店铺代码过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND m.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)';
+      params.push(shop_code);
     }
 
     if (search) {

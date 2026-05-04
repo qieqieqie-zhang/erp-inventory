@@ -1,14 +1,19 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useUserStore } from './stores/user'
+import { useShopStore } from './stores/shop'
 import { useRouter } from 'vue-router'
 
 const userStore = useUserStore()
+const shopStore = useShopStore()
 const router = useRouter()
 
-// 初始化用户状态
+// 初始化用户状态和店铺列表
 onMounted(async () => {
-  await userStore.init()
+  await Promise.all([
+    userStore.init(),
+    shopStore.loadShops()
+  ])
 })
 </script>
 

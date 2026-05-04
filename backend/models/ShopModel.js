@@ -110,17 +110,19 @@ class ShopModel extends BaseModel {
 
   /**
    * 创建店铺
-   * @param {Object} data 
+   * @param {Object} data
    * @returns {Promise<Object>}
    */
   async createShop(data) {
     // 自动生成店铺ID（如果未提供）
     const shopId = data.shop_id || this.generateShopId();
+    // 自动生成店铺代码（如果未提供）
+    const shopCode = data.shop_code || this.generateShopCode(data.shop_name);
     const fields = ['shop_id', 'shop_name', 'shop_code', 'shop_type', 'region', 'marketplace', 'seller_id', 'status', 'created_at'];
     const values = [
       shopId,
       data.shop_name,
-      data.shop_code,
+      shopCode,
       data.shop_type || 'Amazon',
       data.region || '',
       data.marketplace || '',
@@ -131,7 +133,20 @@ class ShopModel extends BaseModel {
 
     const sql = `INSERT INTO shops (${fields.join(', ')}) VALUES (${values.map(() => '?').join(', ')})`;
     const result = await this.query(sql, values);
-    return { id: result.insertId, shop_id: shopId, ...data };
+    return { id: result.insertId, shop_id: shopId, shop_code: shopCode, ...data };
+  }
+
+  /**
+   * 生成店铺代码
+   * @param {string} shopName
+   * @returns {string}
+   */
+  generateShopCode(shopName) {
+    if (!shopName) return 'S' + Date.now();
+    // 取店铺名称的前4个字符+时间戳后4位
+    const prefix = shopName.substring(0, 4).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const timestamp = Date.now().toString(36).toUpperCase().slice(-4);
+    return (prefix + timestamp).substring(0, 10);
   }
 
   /**

@@ -126,7 +126,7 @@
       >
         <el-table-column prop="order_id" label="订单号" width="180" sortable />
         <el-table-column prop="sku" label="SKU" width="120" />
-        <el-table-column prop="product_name" label="商品名称" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="product_name_cn" label="中文名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="quantity" label="数量" width="100" align="center" />
         <el-table-column prop="unit_price" label="单价" width="120" align="right">
           <template #default="{ row }">

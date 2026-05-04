@@ -93,6 +93,7 @@
       <el-table-column type="selection" width="50" />
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column prop="shop_id" label="店铺标识ID" width="180" />
+      <el-table-column prop="shop_code" label="店铺代码" width="120" />
       <el-table-column prop="shop_name" label="店铺名称" min-width="180">
         <template #default="{ row }">
           <div class="shop-name">
@@ -160,6 +161,9 @@
         <el-form-item label="店铺名称" prop="shop_name">
           <el-input v-model="shopForm.shop_name" placeholder="请输入店铺名称" />
         </el-form-item>
+        <el-form-item label="店铺代码" prop="shop_code">
+          <el-input v-model="shopForm.shop_code" placeholder="请输入店铺代码" />
+        </el-form-item>
         <el-form-item label="店铺类型" prop="shop_type">
           <el-select v-model="shopForm.shop_type" placeholder="请选择店铺类型" style="width: 100%">
             <el-option label="Amazon" value="Amazon" />
@@ -226,6 +230,7 @@ const currentShopId = ref(null)
 const shopForm = reactive({
   shop_id: '',
   shop_name: '',
+  shop_code: '',
   shop_type: 'Amazon',
   region: '',
   marketplace: '',
@@ -239,6 +244,7 @@ const formRules = {
     { pattern: /^[A-Za-z0-9_-]{3,50}$/, message: '店铺标识ID只能包含字母、数字、下划线和短横线，长度3-50位', trigger: 'blur' }
   ],
   shop_name: [{ required: true, message: '请输入店铺名称', trigger: 'blur' }],
+  shop_code: [{ required: false, message: '请输入店铺代码', trigger: 'blur' }],
   shop_type: [{ required: true, message: '请选择店铺类型', trigger: 'change' }],
   status: [{ required: true, message: '请选择状态', trigger: 'change' }]
 }
@@ -316,6 +322,7 @@ const showAddDialog = () => {
   Object.assign(shopForm, {
     shop_id: '',
     shop_name: '',
+    shop_code: '',
     shop_type: 'Amazon',
     region: '',
     marketplace: '',
@@ -332,6 +339,7 @@ const handleEdit = (row) => {
   Object.assign(shopForm, {
     shop_id: row.shop_id || '',
     shop_name: row.shop_name,
+    shop_code: row.shop_code || '',
     shop_type: row.shop_type,
     region: row.region,
     marketplace: row.marketplace,

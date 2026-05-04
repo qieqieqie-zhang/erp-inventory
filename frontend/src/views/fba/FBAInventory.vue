@@ -339,10 +339,10 @@
             fixed
           />
 
-          <!-- 商品名称 -->
+          <!-- 中文名称 -->
           <el-table-column
-            prop="product_name"
-            label="商品名称"
+            prop="product_name_cn"
+            label="中文名称"
             min-width="200"
             show-overflow-tooltip
           />

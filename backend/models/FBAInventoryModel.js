@@ -208,7 +208,7 @@ class FBAInventoryModel extends BaseModel {
 
   /**
    * 获取FBA库存列表
-   * @param {Object} options 
+   * @param {Object} options
    * @returns {Promise<Array>}
    */
   async getInventoryList(options = {}) {
@@ -217,20 +217,31 @@ class FBAInventoryModel extends BaseModel {
       pageSize = 20,
       search = '',
       marketplace = '',
+      shop_code = '',
       minAvailable = null,
       maxAvailable = null,
       minDaysSupply = null,
       maxDaysSupply = null
     } = options;
 
-    let sql = 'SELECT * FROM amazon_fba_inventory WHERE 1=1';
+    let sql = `SELECT f.*, p.product_name_cn FROM amazon_fba_inventory f
+               LEFT JOIN product_master p ON f.seller_sku = p.seller_sku COLLATE utf8mb4_general_ci`;
     const params = [];
+    const conditions = [];
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ` WHERE f.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)`;
+      params.push(shop_code);
+    } else {
+      sql += ' WHERE 1=1';
+    }
 
     // 搜索条件
     if (search) {
-      sql += ' AND (seller_sku LIKE ? OR item_name LIKE ? OR asin LIKE ? OR fnsku LIKE ?)';
+      sql += ' AND (f.seller_sku LIKE ? OR p.product_name_cn LIKE ? OR f.item_name LIKE ? OR f.asin LIKE ? OR f.fnsku LIKE ?)';
       const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     // 站点过滤
@@ -287,10 +298,16 @@ class FBAInventoryModel extends BaseModel {
    * @returns {Promise<number>}
    */
   async countInventory(filters = {}) {
-    const { search = '', marketplace = '' } = filters;
-    
+    const { search = '', marketplace = '', shop_code = '' } = filters;
+
     let sql = 'SELECT COUNT(*) as count FROM amazon_fba_inventory WHERE 1=1';
     const params = [];
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND shop_id IN (SELECT id FROM shops WHERE shop_code = ?)';
+      params.push(shop_code);
+    }
 
     if (search) {
       sql += ' AND (seller_sku LIKE ? OR item_name LIKE ? OR asin LIKE ? OR fnsku LIKE ?)';
@@ -309,10 +326,13 @@ class FBAInventoryModel extends BaseModel {
 
   /**
    * 获取FBA库存统计信息
+   * @param {Object} options - 查询选项
    * @returns {Promise<Object>}
    */
-  async getInventoryStats() {
-    const [stats] = await this.query(`
+  async getInventoryStats(options = {}) {
+    const { shop_code = '' } = options;
+
+    let sql = `
       SELECT
         COUNT(*) as total_sku,
         SUM(available_quantity) as total_available,
@@ -378,9 +398,19 @@ class FBAInventoryModel extends BaseModel {
           CASE WHEN unfulfillable_quantity > 0 THEN 1 ELSE 0 END
         ) as unfulfillable_count
 
-      FROM amazon_fba_inventory
-    `);
+      FROM amazon_fba_inventory f
+    `;
+    const params = [];
 
+    // 店铺过滤
+    if (shop_code) {
+      sql += ` WHERE f.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)`;
+      params.push(shop_code);
+    } else {
+      sql += ' WHERE 1=1';
+    }
+
+    const [stats] = await this.query(sql, params);
     return stats;
   }
 

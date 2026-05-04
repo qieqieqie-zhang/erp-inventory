@@ -1,5 +1,6 @@
 const FileParser = require('../utils/fileParser');
 const FBAInventoryModel = require('../models/FBAInventoryModel');
+const ProductModel = require('../models/ProductModel');
 const UploadLogModel = require('../models/UploadLogModel');
 
 /**
@@ -584,6 +585,7 @@ class FBAInventoryController {
         pageSize = 20,
         search = '',
         marketplace = '',
+        shop_code = '',
         minAvailable = '',
         maxAvailable = '',
         minDaysSupply = '',
@@ -597,7 +599,8 @@ class FBAInventoryController {
         page: parseInt(page),
         pageSize: parseInt(pageSize),
         search: search,
-        marketplace: marketplace
+        marketplace: marketplace,
+        shop_code: shop_code
       };
 
       // 可用库存过滤
@@ -812,6 +815,19 @@ class FBAInventoryController {
         return mapped;
       });
 
+      // 参考经营驾驶舱，批量查询中文名称并合并
+      const skuList = mappedInventory.map(item => item.sku).filter(Boolean);
+      if (skuList.length > 0) {
+        const nameMap = await ProductModel.getProductNameMapBySkus(skuList);
+        mappedInventory.forEach(item => {
+          item.product_name_cn = nameMap[item.sku] || null;
+        });
+      } else {
+        mappedInventory.forEach(item => {
+          item.product_name_cn = null;
+        });
+      }
+
       // 获取站点列表（用于筛选器）
       const marketplaces = await FBAInventoryModel.query(
         'SELECT DISTINCT marketplace FROM amazon_fba_inventory WHERE marketplace IS NOT NULL AND marketplace != "" ORDER BY marketplace'
@@ -846,7 +862,8 @@ class FBAInventoryController {
    */
   async getStats(req, res) {
     try {
-      const stats = await FBAInventoryModel.getInventoryStats();
+      const { shop_code = '' } = req.query;
+      const stats = await FBAInventoryModel.getInventoryStats({ shop_code });
       
       res.json({
         code: 200,

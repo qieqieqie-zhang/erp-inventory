@@ -41,10 +41,12 @@ api.interceptors.response.use(
       
       switch (status) {
         case 401:
-          // token失效，清除本地存储并跳转到登录页
+          // token失效，清除本地存储并跳转到登录页（仅当不在登录页时）
           localStorage.removeItem('token')
           localStorage.removeItem('userInfo')
-          router.push('/login')
+          if (router.currentRoute.value.path !== '/login') {
+            router.push('/login')
+          }
           break
         case 403:
           // 权限不足

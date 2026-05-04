@@ -196,9 +196,9 @@
           <el-table-column prop="parent_asin" label="父ASIN" width="130" show-overflow-tooltip />
           <el-table-column prop="child_asin" label="子ASIN" width="130" show-overflow-tooltip />
           <el-table-column prop="sku" label="SKU" width="120" show-overflow-tooltip />
-          <el-table-column prop="title" label="标题" width="180" show-overflow-tooltip>
+          <el-table-column prop="product_name_cn" label="中文名称" width="180" show-overflow-tooltip>
             <template #default="{ row }">
-              <span class="title-cell" :title="row.title">{{ row.title || '-' }}</span>
+              <span class="title-cell" :title="row.product_name_cn">{{ row.product_name_cn || '-' }}</span>
             </template>
           </el-table-column>
 

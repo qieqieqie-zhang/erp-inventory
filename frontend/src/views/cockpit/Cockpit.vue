@@ -3,11 +3,13 @@
     <!-- 页面标题 -->
     <div class="page-header">
       <div class="header-left">
-        <h1 class="page-title">经营驾驶舱</h1>
-        <el-breadcrumb separator="/">
-          <el-breadcrumb-item>数据分析</el-breadcrumb-item>
-          <el-breadcrumb-item>经营驾驶舱</el-breadcrumb-item>
-        </el-breadcrumb>
+        <div class="header-titles">
+          <h1 class="page-title">经营驾驶舱</h1>
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item>数据分析</el-breadcrumb-item>
+            <el-breadcrumb-item>经营驾驶舱</el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
       </div>
       <div class="header-right">
         <el-button :icon="Refresh" @click="refreshAll" :loading="loading">刷新</el-button>
@@ -117,9 +119,9 @@
               <!-- 搜索 -->
               <el-input
                 v-model="filters.search"
-                placeholder="SKU/商品名称/ASIN"
+                placeholder="SKU/商品名称/中文名称/ASIN"
                 :prefix-icon="Search"
-                style="width: 180px;"
+                style="width: 200px;"
                 clearable
                 @input="handleFilterChange"
               />
@@ -134,6 +136,7 @@
                 <el-option label="全部" value="all" />
                 <el-option label="立即补货" value="立即补货" />
                 <el-option label="观察在途" value="观察在途" />
+                <el-option label="关注销售" value="关注销售" />
                 <el-option label="暂不补货" value="暂不补货" />
                 <el-option label="控制补货" value="控制补货" />
               </el-select>
@@ -180,6 +183,18 @@
                   :value="cat.id"
                 />
               </el-select>
+              <!-- FBA/FBM过滤 -->
+              <el-select
+                v-model="filters.fulfillmentChannel"
+                placeholder="FBA/FBM"
+                style="width: 120px;"
+                clearable
+                @change="handleFilterChange"
+              >
+                <el-option label="全部" value="" />
+                <el-option label="FBA" value="FBA" />
+                <el-option label="FBM" value="FBM" />
+              </el-select>
             </div>
                       </div>
         </template>
@@ -197,12 +212,6 @@
           <el-table-column prop="product_name_cn" label="中文名称" width="160" fixed="left" show-overflow-tooltip>
             <template #default="{ row }">
               <span>{{ row.product_name_cn || '-' }}</span>
-            </template>
-          </el-table-column>
-          <!-- 固定列 - 商品名称 -->
-          <el-table-column prop="product_name" label="商品名称" width="160" fixed="left" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span class="product-name-cell" :title="row.product_name">{{ row.product_name || '-' }}</span>
             </template>
           </el-table-column>
 
@@ -620,7 +629,8 @@ const filters = ref({
   replenishment: '',
   riskTag: '',
   hasInTransit: '',
-  categoryId: ''
+  categoryId: '',
+  fulfillmentChannel: 'FBA'
 })
 
 // 分类列表
@@ -720,7 +730,8 @@ const loadCoreTable = async () => {
       replenishment: filters.value.replenishment,
       risk_tag: filters.value.riskTag,
       has_in_transit: filters.value.hasInTransit,
-      category_id: filters.value.categoryId
+      category_id: filters.value.categoryId,
+      fulfillment_channel: filters.value.fulfillmentChannel
     })
     if (res && res.list) {
       coreTableData.value = res.list
@@ -1049,11 +1060,23 @@ onBeforeUnmount(() => {
   margin-bottom: 24px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
 .header-left .page-title {
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   font-size: 24px;
   font-weight: bold;
   color: #303133;
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* 概览卡片 */

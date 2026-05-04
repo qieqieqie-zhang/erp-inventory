@@ -92,22 +92,35 @@ class FBAReservedModel extends BaseModel {
       search = '',
       asinSearch = '',
       reasonFilter = '',
-      dataStatusFilter = ''
+      dataStatusFilter = '',
+      shop_code = ''
     } = options;
 
-    let sql = 'SELECT * FROM amazon_fba_reserved WHERE 1=1';
+    let sql = `SELECT fr.*, p.product_name_cn FROM amazon_fba_reserved fr
+               LEFT JOIN product_master p ON fr.sku = p.seller_sku COLLATE utf8mb4_general_ci`;
     const params = [];
+    const conditions = [];
 
-    // SKU搜索
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ` WHERE fr.sku IN (SELECT pm.seller_sku FROM product_master pm WHERE pm.shop_id IN (SELECT id FROM shops WHERE shop_code = ?))`;
+      params.push(shop_code);
+    }
+
+    if (conditions.length > 0) {
+      sql += ' AND ' + conditions.join(' AND ');
+    }
+
+    // SKU/中文名称搜索
     if (search) {
-      sql += ' AND (sku LIKE ? OR product_name LIKE ?)';
+      sql += ' AND (fr.sku LIKE ? OR p.product_name_cn LIKE ? OR fr.product_name LIKE ?)';
       const searchTerm = `%${search}%`;
-      params.push(searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm);
     }
 
     // ASIN搜索
     if (asinSearch) {
-      sql += ' AND asin LIKE ?';
+      sql += ' AND fr.asin LIKE ?';
       params.push(`%${asinSearch}%`);
     }
 
@@ -166,10 +179,16 @@ class FBAReservedModel extends BaseModel {
    * @returns {Promise<number>}
    */
   async countReserved(filters = {}) {
-    const { search = '', asinSearch = '', reasonFilter = '', dataStatusFilter = '' } = filters;
+    const { search = '', asinSearch = '', reasonFilter = '', dataStatusFilter = '', shop_code = '' } = filters;
 
     let sql = 'SELECT COUNT(*) as count FROM amazon_fba_reserved WHERE 1=1';
     const params = [];
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND sku IN (SELECT pm.seller_sku FROM product_master pm WHERE pm.shop_id IN (SELECT id FROM shops WHERE shop_code = ?))';
+      params.push(shop_code);
+    }
 
     if (search) {
       sql += ' AND (sku LIKE ? OR product_name LIKE ?)';
@@ -225,10 +244,12 @@ class FBAReservedModel extends BaseModel {
 
   /**
    * 获取预留库存统计信息
+   * @param {Object} options - 查询选项，支持 shop_code
    * @returns {Promise<Object>}
    */
-  async getReservedStats() {
-    const [stats] = await this.query(`
+  async getReservedStats(options = {}) {
+    const { shop_code = '' } = options;
+    let sql = `
       SELECT
         COUNT(*) as total_sku,
         SUM(reserved_qty) as total_reserved_qty,
@@ -237,9 +258,17 @@ class FBAReservedModel extends BaseModel {
         SUM(reserved_fc_processing) as total_fc_processing,
         SUM(reserved_customerorders + reserved_fc_transfers + reserved_fc_processing) as detail_total,
         AVG(reserved_qty) as avg_reserved_qty
-      FROM amazon_fba_reserved
-    `);
+      FROM amazon_fba_reserved fr
+    `;
+    const params = [];
 
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ` WHERE fr.sku IN (SELECT pm.seller_sku FROM product_master pm WHERE pm.shop_id IN (SELECT id FROM shops WHERE shop_code = ?))`;
+      params.push(shop_code);
+    }
+
+    const [stats] = await this.query(sql, params);
     return stats;
   }
 

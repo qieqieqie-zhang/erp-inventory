@@ -237,6 +237,7 @@ class ProductController {
         status = '',
         channel = '',
         shop_id = '',
+        shop_code = '',
         minQuantity = '',
         maxQuantity = ''
       } = req.query;
@@ -248,7 +249,8 @@ class ProductController {
         search: search,
         status: status,
         channel: channel,
-        shop_id: shop_id
+        shop_id: shop_id,
+        shop_code: shop_code
       };
 
       // 数量过滤
@@ -332,8 +334,12 @@ class ProductController {
    */
   async getStats(req, res) {
     try {
-      const stats = await ProductModel.getProductStats();
-      
+      const { shopId = '', shop_code = '' } = req.query;
+      const stats = await ProductModel.getProductStats({
+        shopId: shopId ? parseInt(shopId) : null,
+        shop_code: shop_code
+      });
+
       res.json({
         code: 200,
         message: '获取成功',

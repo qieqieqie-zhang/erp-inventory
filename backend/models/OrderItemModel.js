@@ -671,6 +671,7 @@ class OrderItemModel {
   async getSkuMultiWindowSales(options = {}) {
     const {
       storeId = null,
+      shopCode = null,
       endDate = null,
       orderStatusExclude = ['Cancelled']
     } = options;
@@ -696,30 +697,38 @@ class OrderItemModel {
 
     let sql = `
       SELECT
-        sku,
-        product_name,
-        asin,
-        sales_channel,
-        currency,
-        MAX(purchase_date) as latest_purchase_date,
-        MAX(purchase_date) as last_order_time
-      FROM ${this.tableName}
-      WHERE sku IS NOT NULL AND sku != ''
+        o.sku,
+        o.product_name,
+        o.asin,
+        o.sales_channel,
+        o.currency,
+        MAX(o.purchase_date) as latest_purchase_date,
+        MAX(o.purchase_date) as last_order_time
+      FROM ${this.tableName} o
+      LEFT JOIN shops s ON o.store_id = s.id
+      WHERE o.sku IS NOT NULL AND o.sku != ''
     `;
     const params = [];
 
     if (storeId) {
-      sql += ' AND store_id = ?';
+      sql += ' AND o.store_id = ?';
       params.push(storeId);
     }
 
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shopCode) {
+      console.log('[OrderItemModel getSkuMultiWindowSales] shopCode:', shopCode);
+      sql += ' AND o.store_id IN (SELECT id FROM shops WHERE shop_code = ?)';
+      params.push(shopCode);
+    }
+
     if (orderStatusExclude && orderStatusExclude.length > 0) {
-      sql += ` AND order_status NOT IN (${orderStatusExclude.map(() => '?').join(', ')})`;
+      sql += ` AND o.order_status NOT IN (${orderStatusExclude.map(() => '?').join(', ')})`;
       params.push(...orderStatusExclude);
     }
 
-    sql += ' GROUP BY sku, product_name, asin, sales_channel, currency';
-    sql += ' ORDER BY sku';
+    sql += ' GROUP BY o.sku, o.product_name, o.asin, o.sales_channel, o.currency';
+    sql += ' ORDER BY o.sku';
 
     const baseSkus = await this.query(sql, params);
 

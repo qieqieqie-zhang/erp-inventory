@@ -5,6 +5,20 @@ class LogisticsModel extends BaseModel {
     super('logistics_tracking');
   }
 
+  // 日期字段列表
+  static DATE_FIELDS = ['ship_date', 'create_date', 'delivery_date', 'arrival_date'];
+
+  // 将空字符串日期转为 null
+  _sanitizeDateFields(data) {
+    const result = { ...data };
+    for (const field of LogisticsModel.DATE_FIELDS) {
+      if (result[field] === '') {
+        result[field] = null;
+      }
+    }
+    return result;
+  }
+
   /**
    * 获取物流跟踪列表（支持分页、搜索、筛选）
    * @param {Object} options
@@ -18,17 +32,30 @@ class LogisticsModel extends BaseModel {
       status = '',
       country = '',
       shopId = null,
+      shop_code = '',
       startDate = null,
       endDate = null
     } = options;
 
-    let sql = 'SELECT * FROM logistics_tracking WHERE 1=1';
+    let sql = 'SELECT lt.* FROM logistics_tracking lt';
     const params = [];
+    const conditions = [];
 
-    // 店铺过滤
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
     if (shopId) {
-      sql += ' AND shop_id = ?';
+      conditions.push('lt.shop_id = ?');
       params.push(shopId);
+    }
+
+    if (shop_code) {
+      conditions.push('lt.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)');
+      params.push(shop_code);
+    }
+
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    } else {
+      sql += ' WHERE 1=1';
     }
 
     // 搜索条件
@@ -77,7 +104,7 @@ class LogisticsModel extends BaseModel {
    * @returns {Promise<number>}
    */
   async count(filters = {}) {
-    const { search = '', status = '', country = '', shopId = null, startDate = null, endDate = null } = filters;
+    const { search = '', status = '', country = '', shopId = null, shop_code = '', startDate = null, endDate = null } = filters;
 
     let sql = 'SELECT COUNT(*) as count FROM logistics_tracking WHERE 1=1';
     const params = [];
@@ -85,6 +112,12 @@ class LogisticsModel extends BaseModel {
     if (shopId) {
       sql += ' AND shop_id = ?';
       params.push(shopId);
+    }
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND shop_id IN (SELECT id FROM shops WHERE shop_code = ?)';
+      params.push(shop_code);
     }
 
     if (search) {
@@ -136,14 +169,15 @@ class LogisticsModel extends BaseModel {
    * @returns {Promise<Object>}
    */
   async create(data) {
-    const keys = Object.keys(data);
-    const values = Object.values(data);
+    const sanitized = this._sanitizeDateFields(data);
+    const keys = Object.keys(sanitized);
+    const values = Object.values(sanitized);
 
     const placeholders = keys.map(() => '?').join(', ');
     const sql = `INSERT INTO logistics_tracking (${keys.join(', ')}) VALUES (${placeholders})`;
 
     const [result] = await this.pool.execute(sql, values);
-    return { id: result.insertId, ...data };
+    return { id: result.insertId, ...sanitized };
   }
 
   /**
@@ -156,8 +190,9 @@ class LogisticsModel extends BaseModel {
       return { affectedRows: 0 };
     }
 
-    const keys = Object.keys(dataArray[0]);
-    const values = dataArray.map(item => Object.values(item));
+    const sanitizedArray = dataArray.map(item => this._sanitizeDateFields(item));
+    const keys = Object.keys(sanitizedArray[0]);
+    const values = sanitizedArray.map(item => Object.values(item));
 
     const placeholders = dataArray.map(() =>
       `(${keys.map(() => '?').join(', ')})`
@@ -177,8 +212,9 @@ class LogisticsModel extends BaseModel {
    * @returns {Promise<boolean>}
    */
   async update(id, data) {
-    const keys = Object.keys(data);
-    const values = Object.values(data);
+    const sanitized = this._sanitizeDateFields(data);
+    const keys = Object.keys(sanitized);
+    const values = Object.values(sanitized);
 
     const setClause = keys.map(key => `${key} = ?`).join(', ');
     const sql = `UPDATE logistics_tracking SET ${setClause} WHERE id = ?`;
@@ -214,10 +250,11 @@ class LogisticsModel extends BaseModel {
 
   /**
    * 获取物流统计信息
-   * @param {number} shopId
+   * @param {Object} options - 查询选项，支持 shopId 或 shop_code
    * @returns {Promise<Object>}
    */
-  async getStats(shopId = null) {
+  async getStats(options = {}) {
+    const { shopId = null, shop_code = '' } = options;
     let sql = `
       SELECT
         COUNT(*) as total,
@@ -227,13 +264,23 @@ class LogisticsModel extends BaseModel {
         COALESCE(SUM(CASE WHEN logistics_status = 'arrived' THEN 1 ELSE 0 END), 0) as arrived_count,
         COALESCE(SUM(CASE WHEN logistics_status = 'customs_cleared' THEN 1 ELSE 0 END), 0) as customs_cleared_count,
         COALESCE(SUM(CASE WHEN logistics_status = 'delivered' THEN 1 ELSE 0 END), 0) as delivered_count
-      FROM logistics_tracking
+      FROM logistics_tracking lt
     `;
     const params = [];
+    const conditions = [];
 
     if (shopId) {
-      sql += ' WHERE shop_id = ?';
+      conditions.push('lt.shop_id = ?');
       params.push(shopId);
+    }
+
+    if (shop_code) {
+      conditions.push('lt.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)');
+      params.push(shop_code);
+    }
+
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
     }
 
     const rows = await this.query(sql, params);
@@ -260,7 +307,7 @@ class LogisticsModel extends BaseModel {
    * @param {number} shopId - 店铺ID（可选）
    * @returns {Promise<number>} 唯一SKU数量
    */
-  async getInTransitSkuCount(shopId = null) {
+  async getInTransitSkuCount(shopId = null, shop_code = '') {
     // 物流在途 SKU 数：统计所有物流记录中的唯一 SKU（包含 pending/shipped/in_transit 等状态）
     let sql = `
       SELECT * FROM logistics_tracking
@@ -271,6 +318,12 @@ class LogisticsModel extends BaseModel {
     if (shopId) {
       sql += ' AND shop_id = ?';
       params.push(shopId);
+    }
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND shop_id IN (SELECT id FROM shops WHERE shop_code = ?)';
+      params.push(shop_code);
     }
 
     const rows = await this.query(sql, params);

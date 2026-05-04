@@ -1,5 +1,6 @@
 const FileParser = require('../utils/fileParser');
 const FBAReservedModel = require('../models/FBAReservedModel');
+const ProductModel = require('../models/ProductModel');
 const UploadLogModel = require('../models/UploadLogModel');
 
 /**
@@ -351,7 +352,8 @@ class FBAReservedController {
         search = '',
         asinSearch = '',
         reasonFilter = '',
-        dataStatusFilter = ''
+        dataStatusFilter = '',
+        shop_code = ''
       } = req.query;
 
       // 构建查询选项
@@ -361,7 +363,8 @@ class FBAReservedController {
         search: search,
         asinSearch: asinSearch,
         reasonFilter: reasonFilter,
-        dataStatusFilter: dataStatusFilter
+        dataStatusFilter: dataStatusFilter,
+        shop_code: shop_code
       };
 
       // 获取数据
@@ -372,6 +375,19 @@ class FBAReservedController {
 
       // 映射数据，添加衍生字段
       const mappedReserved = reserved.map(item => mapReservedItem(item));
+
+      // 参考经营驾驶舱，批量查询中文名称并合并
+      const skuList = mappedReserved.map(item => item.sku).filter(Boolean);
+      if (skuList.length > 0) {
+        const nameMap = await ProductModel.getProductNameMapBySkus(skuList);
+        mappedReserved.forEach(item => {
+          item.product_name_cn = nameMap[item.sku] || null;
+        });
+      } else {
+        mappedReserved.forEach(item => {
+          item.product_name_cn = null;
+        });
+      }
 
       // Program列表（用于筛选器）
       const programs = await FBAReservedModel.query(
@@ -407,7 +423,8 @@ class FBAReservedController {
    */
   async getStats(req, res) {
     try {
-      const stats = await FBAReservedModel.getReservedStats();
+      const { shop_code = '' } = req.query;
+      const stats = await FBAReservedModel.getReservedStats({ shop_code });
 
       // 检查数据一致性
       const total_reserved_qty = num(stats.total_reserved_qty);

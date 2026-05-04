@@ -11,6 +11,7 @@ class ProductNameSkuMappingController {
         page = 1,
         pageSize = 20,
         shop_id = '',
+        shop_code = '',
         search = ''
       } = req.query;
 
@@ -18,6 +19,7 @@ class ProductNameSkuMappingController {
         page: parseInt(page),
         pageSize: parseInt(pageSize),
         shop_id: shop_id ? parseInt(shop_id) : null,
+        shop_code: shop_code,
         search
       });
 

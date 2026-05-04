@@ -23,17 +23,6 @@
     <el-card shadow="never" class="filter-card">
       <div class="filter-container">
         <el-form :model="filterForm" label-width="80px" :inline="true">
-          <el-form-item label="店铺">
-            <el-select v-model="filterForm.shopId" placeholder="选择店铺" clearable>
-              <el-option label="全部店铺" value="" />
-              <el-option
-                v-for="shop in shopList"
-                :key="shop.id"
-                :label="shop.shop_name"
-                :value="shop.id"
-              />
-            </el-select>
-          </el-form-item>
           <el-form-item label="物流状态">
             <el-select v-model="filterForm.status" placeholder="全部状态" clearable>
               <el-option
@@ -177,6 +166,8 @@
         <el-table-column type="selection" width="50" />
         <el-table-column prop="id" label="编号" width="80" />
         <el-table-column prop="fba_warehouse_number" label="FBA仓库编号" width="150" />
+        <el-table-column prop="sku_code" label="SKU编号" width="130" show-overflow-tooltip />
+        <el-table-column prop="product_name_cn" label="中文名称" width="160" show-overflow-tooltip />
         <el-table-column prop="tracking_number" label="运输编号" width="150" show-overflow-tooltip />
         <el-table-column prop="destination_country" label="目的地" width="100" />
         <el-table-column prop="cargo_type" label="货物类型" width="100" />
@@ -508,7 +499,6 @@ const stats = ref({})
 const dateRange = ref([])
 
 const filterForm = reactive({
-  shopId: '',
   status: '',
   country: '',
   search: '',
@@ -591,7 +581,6 @@ const fetchData = async () => {
       search: filterForm.search,
       status: filterForm.status,
       country: filterForm.country,
-      shopId: filterForm.shopId,
       startDate: filterForm.startDate,
       endDate: filterForm.endDate
     }
@@ -628,7 +617,7 @@ const fetchCompanies = async () => {
 
 const fetchStats = async () => {
   try {
-    stats.value = await apiService.logistics.getStats({ shopId: filterForm.shopId })
+    stats.value = await apiService.logistics.getStats({})
   } catch (error) {
     console.error('获取统计失败:', error)
   }
@@ -641,7 +630,6 @@ const handleSearch = () => {
 }
 
 const resetFilter = () => {
-  filterForm.shopId = ''
   filterForm.status = ''
   filterForm.country = ''
   filterForm.search = ''
@@ -858,7 +846,6 @@ const exportData = async () => {
   try {
     const params = {
       format: 'json',
-      shopId: filterForm.shopId,
       status: filterForm.status,
       startDate: filterForm.startDate,
       endDate: filterForm.endDate

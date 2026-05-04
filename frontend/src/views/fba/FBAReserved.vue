@@ -192,7 +192,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="sku" label="SKU" width="130" sortable fixed />
-        <el-table-column prop="product_name" label="商品名称" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="product_name_cn" label="中文名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="asin" label="ASIN" width="120" />
         <el-table-column prop="reserved_qty" label="报告预留总数" width="120" align="center" sortable>
           <template #default="{ row }">

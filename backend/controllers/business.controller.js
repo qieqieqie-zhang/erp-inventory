@@ -1,4 +1,5 @@
 const BusinessReportModel = require('../models/BusinessReportModel');
+const ProductModel = require('../models/ProductModel');
 const FileParser = require('../utils/fileParser');
 const UploadLogModel = require('../models/UploadLogModel');
 
@@ -52,7 +53,8 @@ class BusinessController {
         page = 1,
         pageSize = 20,
         orderBy = 'report_month',
-        order = 'DESC'
+        order = 'DESC',
+        shop_code = ''
       } = req.query;
 
       // 默认日期范围（最近30天）
@@ -64,11 +66,24 @@ class BusinessController {
       const end = endDate || defaultEndDate.toISOString().split('T')[0];
 
       // 构建查询条件
-      let conditions = { startDate: start, endDate: end, page, pageSize, orderBy, order };
-      
+      let conditions = { startDate: start, endDate: end, page, pageSize, orderBy, order, shop_code };
+
       // 获取数据
       const reports = await BusinessReportModel.getReportsByDateRange(start, end, conditions);
-      const total = await BusinessReportModel.countReportsByDateRange(start, end);
+      const total = await BusinessReportModel.countReportsByDateRange(start, end, conditions);
+
+      // 参考经营驾驶舱，批量查询中文名称并合并
+      const skuList = reports.map(item => item.sku).filter(Boolean);
+      if (skuList.length > 0) {
+        const nameMap = await ProductModel.getProductNameMapBySkus(skuList);
+        reports.forEach(item => {
+          item.product_name_cn = nameMap[item.sku] || null;
+        });
+      } else {
+        reports.forEach(item => {
+          item.product_name_cn = null;
+        });
+      }
 
       res.json({
         code: 200,
@@ -529,6 +544,19 @@ class BusinessController {
 
       const reports = await BusinessReportModel.getReportsByDateRange(start, end, { page: 1, pageSize: 1000 });
       const summary = await BusinessReportModel.getReportSummary(start, end);
+
+      // 参考经营驾驶舱，批量查询中文名称并合并
+      const skuList = reports.map(item => item.sku).filter(Boolean);
+      if (skuList.length > 0) {
+        const nameMap = await ProductModel.getProductNameMapBySkus(skuList);
+        reports.forEach(item => {
+          item.product_name_cn = nameMap[item.sku] || null;
+        });
+      } else {
+        reports.forEach(item => {
+          item.product_name_cn = null;
+        });
+      }
 
       if (format === 'csv') {
         // CSV格式导出

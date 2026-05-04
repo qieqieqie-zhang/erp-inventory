@@ -97,10 +97,10 @@ class ShopController {
     try {
       const { shop_id, shop_name, shop_code, shop_type, region, marketplace, seller_id, status } = req.body;
       
-      if (!shop_name || !shop_code) {
+      if (!shop_name) {
         return res.status(400).json({
           code: 400,
-          message: '店铺名称和店铺代码不能为空'
+          message: '店铺名称不能为空'
         });
       }
       

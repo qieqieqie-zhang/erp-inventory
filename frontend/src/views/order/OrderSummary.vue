@@ -4,10 +4,6 @@
     <div class="page-header">
       <h2>订单销量汇总</h2>
       <div class="header-actions">
-        <el-select v-model="selectedShopId" placeholder="选择店铺" clearable style="width: 180px; margin-right: 10px;">
-          <el-option label="全部店铺" :value="null" />
-          <el-option v-for="shop in shopList" :key="shop.id" :label="shop.shop_name" :value="shop.id" />
-        </el-select>
         <el-button type="primary" :icon="Upload" @click="showUploadDialog">
           上传订单报告
         </el-button>
@@ -597,6 +593,7 @@ import {
   QuestionFilled
 } from '@element-plus/icons-vue'
 import { apiService } from '../../utils/api'
+import { useShopStore } from '../../stores/shop'
 import UploadDialog from '../../components/UploadDialog.vue'
 
 // ============ 图表实例 ============
@@ -612,10 +609,6 @@ const skuDetailLoading = ref(false)
 // 时间维度
 const activeDimension = ref('all')
 const customDateRange = ref(null)
-
-// 店铺列表
-const shopList = ref([])
-const selectedShopId = ref(null)
 
 // 汇总数据
 const summaryData = ref({})
@@ -655,9 +648,12 @@ const revenueChartRef = ref(null)
 const distributionChartRef = ref(null)
 
 // ============ 上传处理 ============
+const shopStore = useShopStore()
+
 const handleUploadFn = (formData) => {
-  if (selectedShopId.value) {
-    formData.append('shop_id', selectedShopId.value)
+  const shopId = shopStore.currentShopId
+  if (shopId) {
+    formData.append('shop_id', shopId)
   }
   return apiService.orders.upload(formData)
 }
@@ -673,21 +669,11 @@ const showUploadDialog = () => {
 }
 
 // ============ 数据获取 ============
-const fetchShopList = async () => {
-  try {
-    const data = await apiService.shops.getList({ page: 1, pageSize: 100 })
-    shopList.value = data.list || []
-  } catch (error) {
-    console.error('获取店铺列表失败:', error)
-  }
-}
-
 const fetchSummaryData = async () => {
   loading.value = true
   try {
     const params = {
-      dimension: activeDimension.value,
-      shop_id: selectedShopId.value || ''
+      dimension: activeDimension.value
     }
 
     if (customDateRange.value && customDateRange.value.length === 2) {
@@ -710,7 +696,6 @@ const fetchSkuList = async () => {
   try {
     const params = {
       dimension: activeDimension.value,
-      shop_id: selectedShopId.value || '',
       page: skuPage.value,
       pageSize: skuPageSize.value
     }
@@ -734,7 +719,6 @@ const fetchChartsData = async () => {
   try {
     const params = {
       dimension: activeDimension.value,
-      shop_id: selectedShopId.value || '',
       sortBy: topSortBy.value
     }
 
@@ -760,8 +744,7 @@ const fetchChartsData = async () => {
 const fetchReplenishmentData = async () => {
   try {
     const params = {
-      dimension: activeDimension.value,
-      shop_id: selectedShopId.value || ''
+      dimension: activeDimension.value
     }
 
     if (customDateRange.value && customDateRange.value.length === 2) {
@@ -780,8 +763,7 @@ const fetchSkuOrderDetails = async (sku) => {
   skuDetailLoading.value = true
   try {
     const params = {
-      dimension: activeDimension.value,
-      shop_id: selectedShopId.value || ''
+      dimension: activeDimension.value
     }
 
     if (customDateRange.value && customDateRange.value.length === 2) {
@@ -1037,7 +1019,6 @@ const exportData = async () => {
   try {
     const params = {
       dimension: activeDimension.value,
-      shop_id: selectedShopId.value || '',
       format: 'csv'
     }
 
@@ -1138,13 +1119,8 @@ const getStatusTagType = (status) => {
 watch(trendChartType, updateRevenueChart)
 watch(distributionChartType, updateDistributionChart)
 
-watch(selectedShopId, () => {
-  refreshData()
-})
-
 // ============ 生命周期 ============
 onMounted(() => {
-  fetchShopList()
   refreshData()
   initCharts()
 })

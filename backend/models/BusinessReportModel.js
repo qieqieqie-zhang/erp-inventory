@@ -49,7 +49,8 @@ class BusinessReportModel extends BaseModel {
       orderBy = 'report_month',
       order = 'DESC',
       search = '',
-      sku = ''
+      sku = '',
+      shop_code = ''
     } = options;
 
     // 确保分页参数是整数
@@ -88,6 +89,12 @@ class BusinessReportModel extends BaseModel {
       WHERE report_month BETWEEN ? AND ?
     `;
     const params = [startDate, endDate];
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND seller_sku IN (SELECT pm.seller_sku FROM product_master pm WHERE pm.shop_id IN (SELECT id FROM shops WHERE shop_code = ?))';
+      params.push(shop_code);
+    }
 
     // 搜索条件
     if (search) {
@@ -162,13 +169,19 @@ class BusinessReportModel extends BaseModel {
    * @returns {Promise<number>}
    */
   async countReportsByDateRange(startDate, endDate, filters = {}) {
-    const { search = '', sku = '' } = filters;
-    
+    const { search = '', sku = '', shop_code = '' } = filters;
+
     let sql = `
-      SELECT COUNT(*) as count FROM amazon_business_report 
+      SELECT COUNT(*) as count FROM amazon_business_report
       WHERE report_month BETWEEN ? AND ?
     `;
     const params = [startDate, endDate];
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND seller_sku IN (SELECT pm.seller_sku FROM product_master pm WHERE pm.shop_id IN (SELECT id FROM shops WHERE shop_code = ?))';
+      params.push(shop_code);
+    }
 
     if (search) {
       sql += ' AND (seller_sku LIKE ? OR item_title LIKE ? OR parent_asin LIKE ?)';
@@ -187,27 +200,38 @@ class BusinessReportModel extends BaseModel {
 
   /**
    * 获取报告统计摘要
-   * @param {string} startDate 
-   * @param {string} endDate 
+   * @param {string} startDate
+   * @param {string} endDate
+   * @param {string} shopCode - 店铺代码过滤
    * @returns {Promise<Object>}
    */
-  async getReportSummary(startDate, endDate) {
-    const sql = `
+  async getReportSummary(startDate, endDate, shopCode = '') {
+    let sql = `
       SELECT
-        COUNT(DISTINCT seller_sku) as total_skus,
+        COUNT(DISTINCT br.seller_sku) as total_skus,
         COUNT(*) as total_reports,
-        SUM(sales_amount) as total_sales,
-        SUM(ordered_quantity) as total_units,
-        SUM(sessions) as total_sessions,
-        SUM(page_views) as total_page_views,
-        AVG(product_session_percentage) as avg_conversion_rate,
-        SUM(sales_amount) / NULLIF(SUM(ordered_quantity), 0) as avg_unit_price,
-        MIN(report_month) as first_report_date,
-        MAX(report_month) as last_report_date
-      FROM amazon_business_report
-      WHERE report_month BETWEEN ? AND ?
+        SUM(br.sales_amount) as total_sales,
+        SUM(br.ordered_quantity) as total_units,
+        SUM(br.sessions) as total_sessions,
+        SUM(br.page_views) as total_page_views,
+        AVG(br.product_session_percentage) as avg_conversion_rate,
+        SUM(br.sales_amount) / NULLIF(SUM(br.ordered_quantity), 0) as avg_unit_price,
+        MIN(br.report_month) as first_report_date,
+        MAX(br.report_month) as last_report_date
+      FROM amazon_business_report br
     `;
-    const rows = await this.query(sql, [startDate, endDate]);
+    const params = [];
+
+    // 店铺过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shopCode) {
+      sql += ` WHERE br.seller_sku IN (SELECT pm.seller_sku FROM product_master pm WHERE pm.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)) AND br.report_month BETWEEN ? AND ?`;
+      params.push(shopCode, startDate, endDate);
+    } else {
+      sql += ' WHERE br.report_month BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    }
+
+    const rows = await this.query(sql, params);
     const result = rows[0] || {};
     
     // 转换数据类型，确保数字字段是数字类型

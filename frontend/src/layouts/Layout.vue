@@ -100,7 +100,25 @@
           </el-breadcrumb>
         </div>
 
-        <div class="header-right">
+<div class="header-right">
+          <!-- 全局店铺选择器 -->
+          <el-select
+            v-if="shopStore.shops.length > 0"
+            v-model="shopStore.currentShopCode"
+            placeholder="选择店铺"
+            style="width: 160px; margin-right: 12px;"
+            clearable
+            filterable
+            @change="handleShopChange"
+          >
+            <el-option
+              v-for="shop in shopStore.shops"
+              :key="shop.shop_code"
+              :label="shop.shop_name"
+              :value="shop.shop_code"
+            />
+          </el-select>
+
           <!-- 通知 -->
           <el-badge :value="3" class="header-badge">
             <el-button text circle>
@@ -164,10 +182,12 @@ import {
   Bell, User, Lock, SwitchButton, Expand, Fold, ArrowDown, Van
 } from '@element-plus/icons-vue'
 import { useUserStore } from '../stores/user'
+import { useShopStore } from '../stores/shop'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const shopStore = useShopStore()
 
 const isCollapse = ref(false)
 const userInfo = computed(() => userStore.userInfo)
@@ -184,6 +204,12 @@ const toggleCollapse = () => {
 
 const navigateTo = (path) => {
   router.push(path)
+}
+
+const handleShopChange = async (shopCode) => {
+  await shopStore.switchShop(shopCode)
+  // 触发页面刷新
+  router.go(0)
 }
 
 const handleUserCommand = async (command) => {
@@ -222,7 +248,8 @@ const handleUserCommand = async (command) => {
 }
 
 onMounted(() => {
-  // 初始化
+  // 加载全局店铺列表
+  shopStore.loadShops()
 })
 </script>
 

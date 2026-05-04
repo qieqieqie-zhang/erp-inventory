@@ -31,64 +31,62 @@ class ProductModel extends BaseModel {
       return { inserted: 0, updated: 0 };
     }
 
-    // 开始事务
-    const connection = await this.pool.getConnection();
-    await connection.beginTransaction();
+    // 批量 upsert（存在则更新，不存在则插入）
+    const keys = [
+      'seller_sku', 'item_name', 'product_name_cn', 'price', 'quantity', 'pending_quantity',
+      'image_url', 'asin1', 'fulfillment_channel', 'status', 'open_date',
+      'listing_id', 'shop_id', 'upload_batch', 'category_id'
+    ];
 
-    try {
-      // 删除现有数据（全量覆盖或按店铺覆盖）
-      if (shopId) {
-        await connection.execute('DELETE FROM product_master WHERE shop_id = ?', [shopId]);
-      } else {
-        await connection.execute('DELETE FROM product_master');
-      }
+    // UPDATE 的字段（排除 seller_sku, shop_id, upload_batch）
+    const updateKeys = keys.filter(k => !['seller_sku', 'shop_id', 'upload_batch'].includes(k));
 
-      // 批量插入新数据
-      const keys = [
-        'seller_sku', 'item_name', 'product_name_cn', 'price', 'quantity', 'pending_quantity',
-        'image_url', 'asin1', 'fulfillment_channel', 'status', 'open_date',
-        'listing_id', 'shop_id', 'upload_batch', 'category_id'
-      ];
+    // 安全的日期转换
+    const parseDate = (val) => {
+      if (!val || val === '') return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    };
 
-      const values = products.map(product => [
-        product['seller-sku'] || product.seller_sku || '',
-        product['item-name'] || product.item_name || '',
-        product.product_name_cn || '',
-        parseFloat(product.price || product.price || 0),
-        parseInt(product.quantity || product.quantity || 0),
-        parseInt(product['pending-quantity'] || product.pending_quantity || 0),
-        product['image-url'] || product.image_url || '',
-        product.asin1 || product.asin || '',
-        product['fulfillment-channel'] || product.fulfillment_channel || '',
-        product.status || '',
-        product['open-date'] || product.open_date ? new Date(product['open-date'] || product.open_date) : null,
-        product['listing-id'] || product.listing_id || '',
-        shopId,
-        uploadBatch,
-        categoryId
-      ]);
+    const values = products.map(product => [
+      product['seller-sku'] || product.seller_sku || '',
+      product['item-name'] || product.item_name || '',
+      product.product_name_cn || '',
+      parseFloat(product.price || 0),
+      parseInt(product.quantity || 0),
+      parseInt(product['pending-quantity'] || product.pending_quantity || 0),
+      product['image-url'] || product.image_url || '',
+      product.asin1 || product.asin || '',
+      product['fulfillment-channel'] || product.fulfillment_channel || '',
+      product.status || '',
+      parseDate(product['open-date'] || product.open_date),
+      product['listing-id'] || product.listing_id || '',
+      shopId,
+      uploadBatch,
+      categoryId
+    ]);
 
-      const placeholders = products.map(() => 
-        `(${keys.map(() => '?').join(', ')})`
-      ).join(', ');
+    const placeholders = products.map(() =>
+      `(${keys.map(() => '?').join(', ')})`
+    ).join(', ');
 
-      const flattenedValues = values.flat();
-      const sql = `INSERT INTO product_master (${keys.join(', ')}) VALUES ${placeholders}`;
-      
-      const [result] = await connection.execute(sql, flattenedValues);
+    const updateClause = updateKeys.map(k => `${k} = VALUES(${k})`).join(', ');
 
-      await connection.commit();
-      
-      return {
-        inserted: result.affectedRows,
-        updated: 0
-      };
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
+    const flattenedValues = values.flat();
+    const sql = `INSERT INTO product_master (${keys.join(', ')}) VALUES ${placeholders}
+                 ON DUPLICATE KEY UPDATE ${updateClause}`;
+
+    const result = await this.query(sql, flattenedValues);
+
+    // INSERT ON DUPLICATE KEY UPDATE:
+    // - 新插入: affectedRows = 1 per row
+    // - 更新: affectedRows = 2 per row
+    // 计算公式: inserted = 2*N - affectedRows, updated = affectedRows - N
+    const totalRows = products.length;
+    const inserted = Math.max(0, 2 * totalRows - result.affectedRows);
+    const updated = Math.max(0, result.affectedRows - totalRows);
+
+    return { inserted, updated };
   }
 
   /**
@@ -104,6 +102,7 @@ class ProductModel extends BaseModel {
       status = '',
       channel = '',
       shop_id = '',
+      shop_code = '',
       minQuantity = null,
       maxQuantity = null
     } = options;
@@ -118,6 +117,7 @@ class ProductModel extends BaseModel {
         lgs.logistics_status,
         pc.category_name
       FROM product_master p
+      LEFT JOIN shops s ON p.shop_id = s.id
       LEFT JOIN amazon_fba_inventory fi ON p.seller_sku = fi.seller_sku COLLATE utf8mb4_general_ci
       LEFT JOIN amazon_fba_reserved fr ON p.seller_sku = fr.sku COLLATE utf8mb4_general_ci
       LEFT JOIN product_categories pc ON p.category_id = pc.id
@@ -177,6 +177,12 @@ class ProductModel extends BaseModel {
       params.push(shop_id);
     }
 
+    // 店铺代码过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND p.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)';
+      params.push(shop_code);
+    }
+
     // 库存范围过滤
     if (minQuantity !== null) {
       sql += ' AND p.quantity >= ?';
@@ -204,8 +210,8 @@ class ProductModel extends BaseModel {
    * @returns {Promise<number>}
    */
   async countProducts(filters = {}) {
-    const { search = '', status = '', channel = '', shop_id = '' } = filters;
-    
+    const { search = '', status = '', channel = '', shop_id = '', shop_code = '' } = filters;
+
     let sql = 'SELECT COUNT(*) as count FROM product_master WHERE 1=1';
     const params = [];
 
@@ -230,17 +236,27 @@ class ProductModel extends BaseModel {
       params.push(shop_id);
     }
 
+    // 店铺代码过滤（使用子查询避免LEFT JOIN + WHERE失效问题）
+    if (shop_code) {
+      sql += ' AND shop_id IN (SELECT id FROM shops WHERE shop_code = ?)';
+      params.push(shop_code);
+    }
+
     const rows = await this.query(sql, params);
     return parseInt(rows[0].count);
   }
 
   /**
    * 获取商品统计信息
+   * @param {Object} options
+   * @param {number|string} options.shopId - 店铺ID
+   * @param {string} options.shop_code - 店铺代码
    * @returns {Promise<Object>}
    */
-  async getProductStats() {
-    const [stats] = await this.query(`
-      SELECT 
+  async getProductStats(options = {}) {
+    const { shopId = null, shop_code = '' } = options;
+    let sql = `
+      SELECT
         COUNT(*) as total_products,
         SUM(CASE WHEN status = 'Active' THEN 1 ELSE 0 END) as active_products,
         SUM(CASE WHEN status = 'Inactive' THEN 1 ELSE 0 END) as inactive_products,
@@ -248,9 +264,26 @@ class ProductModel extends BaseModel {
         SUM(CASE WHEN fulfillment_channel = '自发货' THEN 1 ELSE 0 END) as merchant_products,
         SUM(quantity) as total_quantity,
         SUM(pending_quantity) as total_pending
-      FROM product_master
-    `);
+      FROM product_master p
+    `;
+    const params = [];
+    const conditions = [];
 
+    if (shopId) {
+      conditions.push('p.shop_id = ?');
+      params.push(shopId);
+    }
+
+    if (shop_code) {
+      conditions.push('p.shop_id IN (SELECT id FROM shops WHERE shop_code = ?)');
+      params.push(shop_code);
+    }
+
+    if (conditions.length > 0) {
+      sql += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    const [stats] = await this.query(sql, params);
     return stats;
   }
 

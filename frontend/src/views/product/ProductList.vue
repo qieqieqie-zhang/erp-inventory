@@ -47,18 +47,7 @@
             @keyup.enter="handleSearch"
           />
         </el-form-item>
-        
-        <el-form-item label="店铺">
-          <el-select v-model="filterForm.shop_id" placeholder="全部店铺" clearable filterable style="width: 180px">
-            <el-option
-              v-for="shop in shopList"
-              :key="shop.id"
-              :label="shop.shop_name"
-              :value="shop.id"
-            />
-          </el-select>
-        </el-form-item>
-        
+
         <el-form-item label="状态">
           <el-select v-model="filterForm.status" placeholder="全部状态" clearable>
             <el-option label="在售" value="active" />
@@ -352,13 +341,15 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
+import {
   Plus, Download, Refresh, Search, Edit, Delete,
   Box, ShoppingCart, Warning, CircleClose
 } from '@element-plus/icons-vue'
 import { apiService } from '@/utils/api.js'
+import { useShopStore } from '@/stores/shop.js'
 
 const router = useRouter()
+const shopStore = useShopStore()
 
 // 数据状态
 const loading = ref(false)
@@ -369,7 +360,6 @@ const editLoading = ref(false)
 // 筛选表单
 const filterForm = ref({
   search: '',
-  shop_id: '',
   status: '',
   category_id: '',
   minQuantity: null,
@@ -385,7 +375,6 @@ const totalCount = ref(0)
 const productList = ref([])
 const stats = ref({})
 const selectedProducts = ref([])
-const shopList = ref([]) // 店铺列表
 const categoryList = ref([]) // 分类列表
 
 // 对话框
@@ -451,17 +440,11 @@ const getStatusTagType = (status) => {
   return typeMap[status] || 'info'
 }
 
-// 根据店铺ID获取店铺名称
-const getShopName = (shopId) => {
-  if (!shopId) return ''
-  const shop = shopList.value.find(s => s.id === shopId)
-  return shop ? shop.shop_name : ''
-}
-
 // 加载数据
 const loadData = async () => {
   tableLoading.value = true
   try {
+    const shopCode = shopStore.getShopCode()
     const [productsRes, statsRes] = await Promise.all([
       apiService.products.getList({
         page: currentPage.value,
@@ -470,9 +453,10 @@ const loadData = async () => {
         status: filterForm.value.status,
         category_id: filterForm.value.category_id,
         minQuantity: filterForm.value.minQuantity,
-        maxQuantity: filterForm.value.maxQuantity
+        maxQuantity: filterForm.value.maxQuantity,
+        shop_code: shopCode
       }),
-      apiService.products.getStats()
+      apiService.products.getStats({ shop_code: shopCode })
     ])
 
     productList.value = productsRes.list || []
@@ -642,21 +626,6 @@ const refreshData = () => {
   loadData()
 }
 
-// 获取店铺列表
-const loadShops = async () => {
-  try {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'}/shops/all`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    })
-    const result = await response.json()
-    if (result.code === 200) {
-      shopList.value = result.data || []
-    }
-  } catch (error) {
-    console.error('获取店铺列表失败:', error)
-  }
-}
-
 // 获取分类列表
 const loadCategories = async () => {
   try {
@@ -669,7 +638,6 @@ const loadCategories = async () => {
 
 // 生命周期
 onMounted(() => {
-  loadShops()
   loadCategories()
   loadData()
 })

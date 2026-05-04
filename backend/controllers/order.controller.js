@@ -261,7 +261,8 @@ class OrderController {
         dimension = 'all',
         startDate = '',
         endDate = '',
-        shop_id = ''
+        shop_id = '',
+        shop_code = ''
       } = req.query;
 
       let queryStartDate = null;
@@ -279,6 +280,7 @@ class OrderController {
 
       const options = {
         storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         startDate: queryStartDate,
         endDate: queryEndDate
       };
@@ -367,12 +369,14 @@ class OrderController {
         startDate = '',
         endDate = '',
         shop_id = '',
+        shop_code = '',
         page = 1,
         pageSize = 100
       } = req.query;
 
       const options = {
         storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         endDate: endDate ? new Date(endDate) : null
       };
 
@@ -431,6 +435,7 @@ class OrderController {
         startDate = '',
         endDate = '',
         shop_id = '',
+        shop_code = '',
         page = 1,
         pageSize = 50
       } = req.query;
@@ -445,6 +450,7 @@ class OrderController {
 
       const options = {
         storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         endDate: endDate ? new Date(endDate) : null
       };
 
@@ -508,11 +514,13 @@ class OrderController {
         startDate = '',
         endDate = '',
         shop_id = '',
+        shop_code = '',
         sortBy = 'units_sold'
       } = req.query;
 
       const options = {
         storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         endDate: endDate ? new Date(endDate) : null
       };
 
@@ -584,11 +592,13 @@ class OrderController {
         dimension = 'all',
         endDate = '',
         shop_id = '',
+        shop_code = '',
         limit = 10
       } = req.query;
 
       const options = {
         storeId: shop_id ? parseInt(shop_id) : null,
+        shopCode: shop_code,
         endDate: endDate ? new Date(endDate) : null,
         limit: parseInt(limit) || 10
       };

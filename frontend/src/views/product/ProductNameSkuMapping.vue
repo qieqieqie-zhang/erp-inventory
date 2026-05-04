@@ -18,11 +18,6 @@
     <!-- 筛选区域 -->
     <div class="filter-section">
       <el-form :inline="true" :model="filterForm">
-        <el-form-item label="店铺">
-          <el-select v-model="filterForm.shop_id" placeholder="全部店铺" clearable filterable style="width: 180px">
-            <el-option v-for="shop in shopList" :key="shop.id" :label="shop.shop_name" :value="shop.id" />
-          </el-select>
-        </el-form-item>
         <el-form-item label="关键词">
           <el-input v-model="filterForm.search" placeholder="中文名称/SKU" clearable style="width: 180px" />
         </el-form-item>
@@ -127,7 +122,6 @@ const tableLoading = ref(false)
 const submitLoading = ref(false)
 
 const filterForm = reactive({
-  shop_id: '',
   search: ''
 })
 
@@ -144,12 +138,10 @@ const isEdit = ref(false)
 const formRef = ref(null)
 const form = reactive({
   id: null,
-  shop_id: null,
   product_name_cn: '',
   seller_sku: ''
 })
 const formRules = {
-  shop_id: [{ required: true, message: '请选择店铺', trigger: 'change' }],
   product_name_cn: [{ required: true, message: '请输入中文名称', trigger: 'blur' }],
   seller_sku: [{ required: true, message: '请输入Seller SKU', trigger: 'blur' }]
 }
@@ -173,7 +165,6 @@ const loadData = async () => {
     const result = await apiService.productNameSkuMapping.getList({
       page: currentPage.value,
       pageSize: pageSize.value,
-      shop_id: filterForm.shop_id || undefined,
       search: filterForm.search
     })
     tableData.value = result.list || []
@@ -191,7 +182,6 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
-  filterForm.shop_id = ''
   filterForm.search = ''
   currentPage.value = 1
   loadData()
@@ -221,7 +211,6 @@ const handleEdit = (row) => {
   isEdit.value = true
   dialogTitle.value = '编辑映射'
   form.id = row.id
-  form.shop_id = row.shop_id
   form.product_name_cn = row.product_name_cn
   form.seller_sku = row.seller_sku
   dialogVisible.value = true
@@ -235,7 +224,6 @@ const handleSubmit = async () => {
     try {
       await apiService.productNameSkuMapping.upsert({
         id: form.id,
-        shop_id: form.shop_id,
         product_name_cn: form.product_name_cn,
         seller_sku: form.seller_sku
       })
@@ -268,17 +256,13 @@ const handleDelete = async (row) => {
 }
 
 const handleImport = async () => {
-  if (!filterForm.shop_id) {
-    ElMessage.warning('请先选择店铺')
-    return
-  }
   try {
     await ElMessageBox.confirm('将从商品资料表导入已有完整映射的数据到映射表。是否继续？', '导入确认', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'info'
     })
-    const result = await apiService.productNameSkuMapping.importFromProducts({ shop_id: filterForm.shop_id })
+    const result = await apiService.productNameSkuMapping.importFromProducts()
     ElMessage.success(result.message || '导入完成')
     loadData()
   } catch (error) {
@@ -289,7 +273,6 @@ const handleImport = async () => {
 }
 
 onMounted(() => {
-  loadShops()
   loadData()
 })
 </script>

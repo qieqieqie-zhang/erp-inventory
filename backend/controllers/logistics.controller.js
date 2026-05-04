@@ -1,4 +1,5 @@
 const LogisticsModel = require('../models/LogisticsModel');
+const ProductModel = require('../models/ProductModel');
 
 class LogisticsController {
   /**
@@ -13,6 +14,7 @@ class LogisticsController {
         status = '',
         country = '',
         shopId = '',
+        shop_code = '',
         startDate = '',
         endDate = ''
       } = req.query;
@@ -31,10 +33,27 @@ class LogisticsController {
         options.shopId = parseInt(shopId);
       }
 
+      if (shop_code) {
+        options.shop_code = shop_code;
+      }
+
       const [list, total] = await Promise.all([
         LogisticsModel.getList(options),
         LogisticsModel.count(options)
       ]);
+
+      // 参考经营驾驶舱，批量查询中文名称并合并
+      const skuList = list.map(item => item.sku_code).filter(Boolean);
+      if (skuList.length > 0) {
+        const nameMap = await ProductModel.getProductNameMapBySkus(skuList);
+        list.forEach(item => {
+          item.product_name_cn = nameMap[item.sku_code] || null;
+        });
+      } else {
+        list.forEach(item => {
+          item.product_name_cn = null;
+        });
+      }
 
       res.json({
         code: 200,
@@ -244,8 +263,11 @@ class LogisticsController {
    */
   async getStats(req, res) {
     try {
-      const { shopId } = req.query;
-      const stats = await LogisticsModel.getStats(shopId ? parseInt(shopId) : null);
+      const { shopId = '', shop_code = '' } = req.query;
+      const stats = await LogisticsModel.getStats({
+        shopId: shopId ? parseInt(shopId) : null,
+        shop_code: shop_code
+      });
 
       res.json({
         code: 200,
